@@ -1,0 +1,11 @@
+---
+description: Deterministic output and LF line endings
+alwaysApply: true
+---
+
+# Determinism
+
+- The same inputs produce byte-identical output. Sort collections. Do not put timestamps, durations, host names, or random ids in report content.
+- A successful report depends on the SBOM bytes, the policy bytes, and the format flag. Do not canonicalize user paths into that report.
+- Write report line endings as LF, including on Windows.
+- Keep repository text on LF via `.gitattributes`, so golden files match on Windows and Linux.

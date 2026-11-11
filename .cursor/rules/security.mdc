@@ -1,0 +1,22 @@
+---
+description: Untrusted-input rules for the bomward security tool
+alwaysApply: true
+---
+
+# Security
+
+bomward is static. SBOM files are hostile.
+
+- No network access, no execution of foreign code, no shell calls.
+- Enforce the input limits in ADR 0006. Reject over-limit input with an error, do not crash.
+- Read only paths the user passed on the command line. Never build a path from SBOM contents.
+- Never write raw SBOM strings into Markdown or terminal output. Escape them. Drop or escape control characters, including ANSI escapes.
+- Do not add real malware or malicious packages as fixtures. Generate inert test data.
+
+```rust
+// Bad: a component name can inject a Markdown link or a terminal escape.
+writeln!(out, "added {name}")?;
+
+// Good: escape before the string reaches the report.
+writeln!(out, "added {}", escape_markdown(name))?;
+```
