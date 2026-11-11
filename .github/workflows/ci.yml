@@ -50,6 +50,29 @@ jobs:
       - name: Test
         run: cargo nextest run --locked
 
+  msrv:
+    name: msrv
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Read rust-version
+        id: rust_version
+        run: |
+          version=$(sed -n 's/^rust-version = "\([^"]*\)"/\1/p' Cargo.toml | head -n 1)
+          if [ -z "$version" ]; then
+            echo "rust-version is missing from Cargo.toml" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+        with:
+          toolchain: ${{ steps.rust_version.outputs.version }}
+      - uses: taiki-e/install-action@f360235162158ca4526b07999d99c38ade05a414 # cargo-nextest
+      - name: Build
+        run: cargo build --locked --all-targets
+      - name: Test
+        run: cargo nextest run --locked
+
   deny:
     name: cargo-deny
     runs-on: ubuntu-latest
