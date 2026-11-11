@@ -193,7 +193,7 @@ fn lockward_shaped_npm_document_is_read() -> Result<(), String> {
     if document
         .warnings
         .iter()
-        .any(|warning| warning.kind == WarningKind::ScopeUnknown)
+        .any(|warning| warning.kind == WarningKind::RoleUnknown)
         && document
             .components
             .values()

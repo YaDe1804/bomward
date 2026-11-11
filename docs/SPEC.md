@@ -46,7 +46,8 @@ or unknown in the document that contains it. That classification uses the
 dependency graph inside a single document.
 [ADR 0010](adr/0010-document-mapping.md) defines the four roles. A document
 with no `metadata.component`, or with no `dependencies` field, marks every
-component unknown and counts one warning. `bom-ref` is never compared
+component unknown and counts one warning, `role-unknown`. `scope` in a
+component is only the CycloneDX field. `bom-ref` is never compared
 across the two documents.
 
 ## Non-goals for v0.1
@@ -153,7 +154,7 @@ rules:
     description: New direct dependencies need a review.
     when:
       change: added # added | removed | version-changed | license-changed | hash-changed | supplier-changed
-      scope: direct # direct | transitive | any
+      role: direct # root | direct | transitive | unknown | any
     decision: deny # allow | deny
 ```
 

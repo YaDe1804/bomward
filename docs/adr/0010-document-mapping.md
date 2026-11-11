@@ -96,10 +96,14 @@ Classification of a component, for a later diff:
 | `unknown` | Not the root and not reachable. |
 
 When `metadata.component` is absent, or the `dependencies` field is
-absent, every component is `unknown` and the document gets one warning,
-kind `scope-unknown`. An empty `dependencies` array is present: the root
-is `root`, and nothing is direct. How AP2 prints these roles is not
-decided here.
+absent, every component's role is `unknown` and the document gets one
+warning, kind `role-unknown`. An empty `dependencies` array is present:
+the root's role is `root`, and nothing is direct. How AP2 prints these
+roles is not decided here.
+
+`scope` is only the CycloneDX field (`required`, `optional`,
+`excluded`, or whatever string the file uses). It is an attribute of a
+version. It is not the graph role.
 
 ### Warnings
 
@@ -112,7 +116,7 @@ one warning.
 | `invalid-purl` | A purl was present and not valid. Text: `invalid purl; fell back to group and name`. |
 | `orphan-ref` | A `ref` or `dependsOn` matches no component. |
 | `duplicate-bom-ref` | Two components share a `bom-ref`. |
-| `scope-unknown` | No root component, or no `dependencies` field. |
+| `role-unknown` | No root component, or no `dependencies` field. The role is `unknown`. |
 | `conflicting-attributes` | The same key and version carried different attributes. |
 
 Warnings do not change the error returned for a valid document. They do
@@ -144,8 +148,9 @@ without a trace. ADR 0005 already made the repeated version one set
 element; this ADR only says what happens to the attributes.
 
 `unknown` is a role, not a failure. Lockfiles and generated SBOMs often
-omit the graph. The warning tells the later report that "direct" was
-not knowable. The diff still has the version sets.
+omit the graph. The warning `role-unknown` tells the later report that
+the role was not knowable. The diff still has the version sets. The
+CycloneDX `scope` field stays an attribute and is not that warning.
 
 ## Alternatives
 

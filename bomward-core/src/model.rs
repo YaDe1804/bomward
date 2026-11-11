@@ -262,8 +262,10 @@ pub enum WarningKind {
     OrphanRef,
     /// Two components declared the same `bom-ref`. Id: `duplicate-bom-ref`.
     DuplicateBomRef,
-    /// No root component, or no `dependencies` field. Id: `scope-unknown`.
-    ScopeUnknown,
+    /// No root component, or no `dependencies` field. Id: `role-unknown`.
+    ///
+    /// This is the graph role. It is not the `CycloneDX` `scope` field.
+    RoleUnknown,
     /// The same key and version carried different attributes.
     /// Id: `conflicting-attributes`.
     ConflictingAttributes,
@@ -277,7 +279,7 @@ impl WarningKind {
             Self::InvalidPurl => "invalid-purl",
             Self::OrphanRef => "orphan-ref",
             Self::DuplicateBomRef => "duplicate-bom-ref",
-            Self::ScopeUnknown => "scope-unknown",
+            Self::RoleUnknown => "role-unknown",
             Self::ConflictingAttributes => "conflicting-attributes",
         }
     }
@@ -289,7 +291,7 @@ impl WarningKind {
             Self::InvalidPurl => "invalid purl; fell back to group and name",
             Self::OrphanRef => "dependency ref does not match a component",
             Self::DuplicateBomRef => "duplicate bom-ref; kept the first component",
-            Self::ScopeUnknown => "component scope is unknown",
+            Self::RoleUnknown => "component role is unknown",
             Self::ConflictingAttributes => "same version carried different attributes",
         }
     }

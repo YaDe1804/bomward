@@ -416,14 +416,14 @@ impl Assembler<'_> {
         let Some(root_key) = self.root_key.clone() else {
             self.warnings.insert(Warning {
                 key: None,
-                kind: WarningKind::ScopeUnknown,
+                kind: WarningKind::RoleUnknown,
             });
             return;
         };
         if !dependencies_present {
             self.warnings.insert(Warning {
                 key: None,
-                kind: WarningKind::ScopeUnknown,
+                kind: WarningKind::RoleUnknown,
             });
             return;
         }
