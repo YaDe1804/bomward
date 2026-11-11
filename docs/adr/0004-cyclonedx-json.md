@@ -73,6 +73,5 @@ non-goal named in the foundation brief.
   a CI log shows both the value in the file and the allowed list.
 - AP1's parser ADR is limited to JSON for these four versions.
 - Adding 1.8, XML, or SPDX requires a new ADR.
-- How the bytes are parsed (a serde model in this repository, or an
-  existing CycloneDX crate) is **not** decided here. AP1 decides that
-  before writing the parser.
+- How the bytes are parsed was left open here. [ADR 0008](0008-cyclonedx-parser.md)
+  chooses an owned serde model.

@@ -1,0 +1,20 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "components": [
+    {
+      "type": "library",
+      "name": "parent",
+      "version": "1",
+      "purl": "pkg:generic/parent@1",
+      "components": [
+        {
+          "type": "library",
+          "name": "child",
+          "version": "2",
+          "purl": "pkg:generic/child@2"
+        }
+      ]
+    }
+  ]
+}

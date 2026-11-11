@@ -6,15 +6,25 @@
 //! [`report`]. This crate does not access the network and does not execute
 //! untrusted code.
 //!
-//! The modules are seams. This foundation milestone does not implement them.
+//! Ingest and the model are implemented. Diff, policy, and report still
+//! return [`Error::NotImplemented`].
 
 #![forbid(unsafe_code)]
 
 pub mod diff;
 pub mod error;
 pub mod ingest;
+pub mod limits;
 pub mod model;
 pub mod policy;
 pub mod report;
 
-pub use error::Error;
+mod purl;
+
+pub use error::{DocumentError, Error, LimitExceeded, LimitKind, UnsupportedDepth};
+pub use ingest::{read_bytes, read_path};
+pub use limits::Limits;
+pub use model::{
+    Component, ComponentKey, ContentHash, DependencyRole, Document, GraphNode, Version,
+    VersionAttributes, VersionId, Warning, WarningKind,
+};

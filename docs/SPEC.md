@@ -1,7 +1,8 @@
 # bomward specification
 
-Status of this document: contract for v0.1. The implementation is not usable yet.
-The foundation CLI parses `diff` and exits with code 2. See [ARCHITECTURE.md](ARCHITECTURE.md).
+Status of this document: contract for v0.1. The library can read a CycloneDX
+JSON document into the model. The CLI parses `diff` and still exits with
+code 2. See [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Purpose
 
@@ -37,14 +38,23 @@ Diff kinds in v0.1:
 - supplier changed
 
 License, hash, and supplier changes apply to a version that is in both
-sets. An invalid `purl` does not reject the file. The key falls back to
-`group` plus `name`, and the report counts and lists a warning.
+sets. Hash content is stored as lowercase hex, so letter case is not a
+hash change. The algorithm name keeps its case. An invalid `purl` does not reject the file. The key falls back to
+`group` plus `name`, and the report counts and lists a warning. When a
+component `version` and its purl version differ, the purl version is
+stored and the document warns `version-mismatch`. A JSON object that
+repeats a key keeps the last value and warns `duplicate-key`.
 
-Each change records whether the component is direct or transitive in the
-document that contains it. That classification uses the dependency graph
-inside a single document. `bom-ref` is never compared across the two
-documents. How a component that is absent from the graph is classified is
-decided with the diff implementation (AP2), not in this foundation.
+Each change records whether that version is direct, transitive, the root,
+or unknown in the document that contains it. The graph node is one key
+together with one version. Two versions of one package can have two roles.
+[ADR 0010](adr/0010-document-mapping.md) defines the four roles. A document
+with no `metadata.component`, or with no `dependencies` field, marks every
+version unknown and counts one warning, `role-unknown`. When the graph
+is present, a version that stays unknown also counts one warning,
+`unreachable`, once per component key. `scope` in a
+component is only the CycloneDX field. `bom-ref` is never compared
+across the two documents.
 
 ## Non-goals for v0.1
 
@@ -85,7 +95,7 @@ bomward diff <OLD> <NEW> [--policy <FILE>] [--format <terminal|markdown|json>] [
 | `--format` | `terminal` (default), `markdown`, or `json`. |
 | `--max-file-bytes` | Max size of one input file. Default `33554432`. |
 | `--max-components` | Max component objects, including nested ones. Default `100000`. |
-| `--max-depth` | Max nesting depth. Default `32`. |
+| `--max-depth` | Max nesting of `components` inside `components`. Does not limit dependency-graph path length or JSON container depth. Default `32`. Maximum `63`. |
 
 `--version` and `--help` exit 0.
 
@@ -133,8 +143,15 @@ unsupported specVersion {found}; supported versions: 1.4, 1.5, 1.6, 1.7
 
 Limits for hostile files are defaults from [ADR 0006](adr/0006-untrusted-input.md):
 32 MiB per file (`--max-file-bytes`), 100,000 components
-(`--max-components`), and nesting depth 32 (`--max-depth`). A violation
-names the limit, the value that was found, and the flag.
+(`--max-components`), and component nesting 32 (`--max-depth`, maximum
+63). That flag covers `components` nested inside `components`. It does
+not cover JSON container depth, and it does not cover how long a
+dependency chain is. JSON arrays and objects are capped at 127. That
+error names the depth that was found and the cap, and it does not name
+`--max-depth`. A `--max-depth` above 63 is a usage error and names the
+requested value and the maximum. A cycle in `dependencies` is stored;
+it is not an error. A file-size, component-count, or component-nesting
+violation names the limit, the value that was found, and the flag.
 
 ## Policy sketch
 
@@ -147,7 +164,7 @@ rules:
     description: New direct dependencies need a review.
     when:
       change: added # added | removed | version-changed | license-changed | hash-changed | supplier-changed
-      scope: direct # direct | transitive | any
+      role: direct # root | direct | transitive | unknown | any
     decision: deny # allow | deny
 ```
 
@@ -169,5 +186,7 @@ The rule is [ADR 0007](adr/0007-exit-codes-and-determinism.md).
 
 ## Deferred
 
-AP0 does not choose the CycloneDX parser. AP1 records that choice in an ADR
-before ingest is implemented.
+The parser is the owned model in [ADR 0008](adr/0008-cyclonedx-parser.md).
+Package URL parsing is [ADR 0009](adr/0009-purl-normalization.md). The field
+mapping is [ADR 0010](adr/0010-document-mapping.md). Diff, policy, and the
+report are later work packages. The CLI does not call ingest yet.

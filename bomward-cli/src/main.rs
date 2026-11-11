@@ -64,9 +64,9 @@ enum Command {
         /// A violation names this limit, the count that was found, and `--max-components`.
         #[arg(long, default_value_t = 100_000)]
         max_components: u64,
-        /// Maximum nesting depth of components and the dependency graph. Default: 32.
+        /// Maximum nesting of components inside components. Default: 32. Maximum: 63.
         ///
-        /// A violation names this limit, the depth that was found, and `--max-depth`.
+        /// Does not limit dependency-graph path length or JSON container depth. JSON containers are capped at 127, and that error does not name this flag. A value above 63 is rejected before the files are read. A component-nesting violation names this limit, the depth that was found, and `--max-depth`.
         #[arg(long, default_value_t = 32)]
         max_depth: u32,
     },
