@@ -67,12 +67,13 @@ It does not open the paths. The contract those flags will have is in
 
 ## Parser
 
-[ADR 0008](adr/0008-cyclonedx-parser.md) chooses an owned serde model over
-`cyclonedx-bom` 0.9.0. The input structs name only the fields in
-[ADR 0010](adr/0010-document-mapping.md) and do not use
-`deny_unknown_fields`. [ADR 0009](adr/0009-purl-normalization.md) parses
-package URLs with `packageurl` 0.7.1. Public entry points are `read_path`
-and `read_bytes`. The CLI does not call them yet.
+[ADR 0008](adr/0008-cyclonedx-parser.md) chooses serde visitors over
+`cyclonedx-bom` 0.9.0. The visitors read only the fields in
+[ADR 0010](adr/0010-document-mapping.md). Unknown JSON is skipped with
+`IgnoredAny` and is not built into a value tree. Component count and
+nesting are checked while reading. [ADR 0009](adr/0009-purl-normalization.md)
+parses package URLs with `packageurl` 0.7.1. Public entry points are
+`read_path` and `read_bytes`. The CLI does not call them yet.
 
 ## Supply chain of the tool
 

@@ -344,6 +344,60 @@ fn component_count_boundary_is_exact() -> Result<(), String> {
     }
 }
 
+#[test]
+fn component_limit_wins_over_later_invalid_json() -> Result<(), String> {
+    let limits =
+        Limits::new(Limits::DEFAULT_MAX_FILE_BYTES, 2, 32).map_err(|error| error.to_string())?;
+    let mut json = count_document(3);
+    json.pop();
+    json.push_str(", NOT_JSON");
+    let error = require_err(read_bytes(json.as_bytes(), &limits))?;
+    if error.to_string() != "component count 3 exceeds limit 2 (--max-components)" {
+        return Err(error.to_string());
+    }
+    match error {
+        Error::LimitExceeded(exceeded) if exceeded.kind == LimitKind::ComponentCount => Ok(()),
+        other => Err(format!("{other}")),
+    }
+}
+
+#[test]
+fn a_large_unknown_field_does_not_change_the_model() -> Result<(), String> {
+    let plain = read_default(
+        br#"{"bomFormat":"CycloneDX","specVersion":"1.6","components":[{"name":"a","version":"1"}]}"#,
+    )
+    .map_err(|error| error.to_string())?;
+    let mut with = String::from(r#"{"bomFormat":"CycloneDX","specVersion":"1.6","ignored":["#);
+    for index in 0..100_000 {
+        if index > 0 {
+            with.push(',');
+        }
+        with.push_str(r#"{"a":0}"#);
+    }
+    with.push_str(r#"],"components":[{"name":"a","version":"1"}]}"#);
+    let document = read_default(with.as_bytes()).map_err(|error| error.to_string())?;
+    if plain.to_canonical_json() != document.to_canonical_json() {
+        return Err(document.to_canonical_json());
+    }
+    Ok(())
+}
+
+#[test]
+fn the_header_is_checked_before_components_in_any_order() -> Result<(), String> {
+    let early = require_err(read_default(
+        br#"{"components":[{"version":"1"}],"bomFormat":"CycloneDX","specVersion":"1.3"}"#,
+    ))?;
+    if early.to_string() != "unsupported specVersion 1.3; supported versions: 1.4, 1.5, 1.6, 1.7" {
+        return Err(early.to_string());
+    }
+    let document = read_default(
+        br#"{"components":[{"name":"a","version":"1"}],"specVersion":"1.6","bomFormat":"CycloneDX"}"#,
+    )
+    .map_err(|error| error.to_string())?;
+    find(&document, "a")?;
+    Ok(())
+}
+
 fn count_document(count: u32) -> String {
     let mut json = String::from(r#"{"bomFormat":"CycloneDX","specVersion":"1.6","components":["#);
     for index in 0..count {

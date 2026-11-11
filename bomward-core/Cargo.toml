@@ -12,7 +12,7 @@ description = "Library for the bomward SBOM review gate."
 [dependencies]
 packageurl = "0.7.1"
 serde = { version = "1.0.229", features = ["derive"] }
-serde_json = "1.0.154"
+serde_json = { version = "1.0.154", features = ["raw_value"] }
 thiserror = "2.0.21"
 
 [lints]
