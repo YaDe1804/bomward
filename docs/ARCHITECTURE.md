@@ -1,8 +1,8 @@
 # Architecture
 
 bomward is a Cargo workspace with two crates. [ADR 0003](adr/0003-rust-workspace.md)
-records that split. There is no domain logic in the foundation: the modules
-and the error type are the seams the later work packages fill.
+records that split. Ingest and the model are implemented. Diff, policy, and
+report are still seams.
 
 ## Crates
 
@@ -19,13 +19,13 @@ unchecked indexing, `todo!`, and `dbg!` in every target.
 
 ## Modules
 
-`bomward-core` exposes five modules. They are empty apart from their docs
-until the matching work package.
+`bomward-core` exposes five modules. Ingest and the model have types and
+functions. The other three are still empty apart from their docs.
 
 | Module | Responsibility | Work package |
 | --- | --- | --- |
-| `ingest` | CycloneDX JSON → model, enforcing the input limits. | AP1 |
-| `model` | Normalized components and identities. | AP1 |
+| `ingest` | CycloneDX JSON → model, enforcing the input limits. | AP1, done |
+| `model` | Normalized components and identities. | AP1, done |
 | `diff` | Added, removed, and changed components. | AP2 |
 | `policy` | YAML rules → a verdict with reasons. | AP3 |
 | `report` | Terminal, Markdown, and JSON rendering. | AP4 |
@@ -45,10 +45,12 @@ files. `ingest` is the only module that interprets CycloneDX JSON.
 `bomward-core` returns `bomward_core::Error`, a `thiserror` enum. Library
 functions do not panic and do not exit the process.
 
-The foundation enum has one variant, `NotImplemented`. It exists so the
-type, the docs, and the test harness are real. Variants will change before
-any release. The crate is `publish = false` and the project is pre-release,
-so this skeleton is not a stability promise.
+`NotImplemented` remains for diff, policy, and report. Ingest adds I/O,
+invalid document, unsupported `specVersion`, and limit variants. The
+limit variant carries the kind (file size, component count, or nesting
+depth), the value that was found, and the limit. Display text matches
+ADR 0004 and ADR 0006. The crate is `publish = false` and pre-release,
+so the enum is not a stability promise.
 
 `bomward-cli` converts library errors and usage failures into a message on
 stderr and an exit code. It may use `anyhow`. A usage error, a rejected
@@ -62,11 +64,14 @@ handler ignores the parsed values and returns the not-implemented error.
 It does not open the paths. The contract those flags will have is in
 [SPEC.md](SPEC.md).
 
-## Parser choice
+## Parser
 
-Not decided. AP1 adds an ADR that chooses either a small serde model owned
-by this repository or an existing CycloneDX crate. Ingest is not started
-before that ADR is accepted.
+[ADR 0008](adr/0008-cyclonedx-parser.md) chooses an owned serde model over
+`cyclonedx-bom` 0.9.0. The input structs name only the fields in
+[ADR 0010](adr/0010-document-mapping.md) and do not use
+`deny_unknown_fields`. [ADR 0009](adr/0009-purl-normalization.md) parses
+package URLs with `packageurl` 0.7.1. Public entry points are `read_path`
+and `read_bytes`. The CLI does not call them yet.
 
 ## Supply chain of the tool
 

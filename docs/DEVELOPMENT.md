@@ -82,9 +82,9 @@ and non-crates.io sources.
 ## Tests
 
 - Unit tests live next to the module they cover.
-- Golden files, once parsers and reports exist, live under that crate's
-  `tests/fixtures/` and are compared byte for byte. Line endings in the
-  repository are LF (`.gitattributes`).
+- Golden files live under that crate's `tests/fixtures/` and are compared
+  byte for byte. Ingest fixtures are in `bomward-core/tests/fixtures/`.
+  Line endings in the repository are LF (`.gitattributes`).
 - CLI tests are integration tests in `bomward-cli/tests`. They spawn the
   `bomward` binary.
 - Test helpers return `Result`. They do not call `unwrap` or `expect`.

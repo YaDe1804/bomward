@@ -1,7 +1,8 @@
 # bomward specification
 
-Status of this document: contract for v0.1. The implementation is not usable yet.
-The foundation CLI parses `diff` and exits with code 2. See [ARCHITECTURE.md](ARCHITECTURE.md).
+Status of this document: contract for v0.1. The library can read a CycloneDX
+JSON document into the model. The CLI parses `diff` and still exits with
+code 2. See [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Purpose
 
@@ -40,11 +41,13 @@ License, hash, and supplier changes apply to a version that is in both
 sets. An invalid `purl` does not reject the file. The key falls back to
 `group` plus `name`, and the report counts and lists a warning.
 
-Each change records whether the component is direct or transitive in the
-document that contains it. That classification uses the dependency graph
-inside a single document. `bom-ref` is never compared across the two
-documents. How a component that is absent from the graph is classified is
-decided with the diff implementation (AP2), not in this foundation.
+Each change records whether the component is direct, transitive, the root,
+or unknown in the document that contains it. That classification uses the
+dependency graph inside a single document.
+[ADR 0010](adr/0010-document-mapping.md) defines the four roles. A document
+with no `metadata.component`, or with no `dependencies` field, marks every
+component unknown and counts one warning. `bom-ref` is never compared
+across the two documents.
 
 ## Non-goals for v0.1
 
@@ -172,5 +175,7 @@ The rule is [ADR 0007](adr/0007-exit-codes-and-determinism.md).
 
 ## Deferred
 
-AP0 does not choose the CycloneDX parser. AP1 records that choice in an ADR
-before ingest is implemented.
+The parser is the owned model in [ADR 0008](adr/0008-cyclonedx-parser.md).
+Package URL parsing is [ADR 0009](adr/0009-purl-normalization.md). The field
+mapping is [ADR 0010](adr/0010-document-mapping.md). Diff, policy, and the
+report are later work packages. The CLI does not call ingest yet.

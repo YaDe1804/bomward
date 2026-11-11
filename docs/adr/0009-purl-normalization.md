@@ -73,11 +73,12 @@ crate lowercases the type, percent-decodes, lowercases qualifier keys,
 drops empty values, and validates the subpath. bomward does not invent
 type rules for it in v0.1.
 
-PyPI is only lowercased. bomward does **not** apply PEP 503 (replacing
-runs of `.`, `-`, and `_` with a single `_`). That rewrite is what
-`purl` 0.1.6 does, and it is a divergence from the type definition
-`packageurl` transcribes. Two PyPI names that differ only by `-` and `_`
-stay two keys in v0.1.
+PyPI names are lowercased. `packageurl` 0.7.1 also rewrites `_` to `-`
+in a PyPI name (`PackageUrl::new`). bomward keeps that behavior.
+It does **not** add PEP 503 on top: `.` is kept, and runs of separators
+are not collapsed. That fuller rewrite is what `purl` 0.1.6 does, and
+it diverges from the type definition this crate transcribes. `a_b` and
+`a-b` are one key; `a.b` stays `a.b`.
 
 ### Duplicate qualifier keys
 

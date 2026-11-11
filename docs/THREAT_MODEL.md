@@ -37,9 +37,11 @@ means `components` inside `components`, and JSON arrays and objects
 while parsing. It does not mean the length of a dependency chain. Each
 default has a flag (`--max-file-bytes`, `--max-components`,
 `--max-depth`). A violation names the limit, the value found, and that
-flag, and exits 2. A dependency cycle is stored as data. Every graph
-walk keeps a visited set, so a cycle cannot spin. Library code does
-not panic.
+flag, and exits 2. JSON container depth is also capped, at
+`min(4 * max_depth + 8, 127)`, so a nested bomb is refused before
+`serde_json` builds it (ADR 0008). A dependency cycle is stored as data.
+Every graph walk keeps a visited set, so a cycle cannot spin. Library
+code does not panic.
 `unsafe` is forbidden, so a parse bug cannot become a memory-safety bug
 inside bomward.
 

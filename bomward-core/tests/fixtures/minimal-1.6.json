@@ -1,0 +1,31 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "metadata": {
+    "component": {
+      "type": "application",
+      "bom-ref": "app",
+      "name": "app",
+      "version": "1.0.0",
+      "purl": "pkg:generic/app@1.0.0"
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "left-pad",
+      "name": "left-pad",
+      "version": "1.2.0",
+      "scope": "required",
+      "purl": "pkg:npm/left-pad@1.2.0",
+      "supplier": { "name": "Example" },
+      "licenses": [
+        { "license": { "id": "MIT" } },
+        { "license": { "name": "Custom" } },
+        { "expression": "MIT OR Apache-2.0" }
+      ],
+      "hashes": [{ "alg": "SHA-256", "content": "abcd" }]
+    }
+  ],
+  "dependencies": [{ "ref": "app", "dependsOn": ["left-pad"] }]
+}

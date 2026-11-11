@@ -46,9 +46,9 @@ gate needs.
    scan counts nested arrays and objects outside strings. The outermost
    value has depth 1. Each nested array or object adds 1. The scan
    rejects a document whose depth is greater than
-   `4 * max_depth + 8`. `{found}` is the observed depth. `{limit}` is
-   that ceiling. The message is still the nesting-depth sentence from
-   ADR 0006, including `(--max-depth)`.
+   `min(4 * max_depth + 8, 127)`. `{found}` is the observed depth.
+   `{limit}` is that ceiling. The message is still the nesting-depth
+   sentence from ADR 0006, including `(--max-depth)`.
 3. **Component count and component nesting, while walking the value.**
    A component in `metadata.component` or in the top-level `components`
    array has depth 1. A component inside a nested `components` array has
@@ -60,16 +60,25 @@ gate needs.
    and the flag value. The function returns the error and drops the
    partial map. It does not return a shortened document.
 
-The ceiling `4 * max_depth + 8` is the JSON measurement of the same flag.
-A component chain of length `max_depth` has container depth
-`2 * max_depth + 1` (the root object, one array and one object per
-level). Licenses, hashes, and the metadata object need further
-containers, so the multiplier is 4 and the document skeleton has 8
-levels of budget. A pure component chain therefore fails the component
+The ceiling is the JSON measurement of the same flag, and it is also
+capped by the parser we hand the bytes to. `serde_json` 1.0.154 starts
+its recursion budget at 128 and rejects the 128th container, so the
+deepest `Value` it will build is 127. v0.1 does not enable the
+`unbounded_depth` feature: a `Value` past that depth is dropped
+recursively and can overflow the stack. The cap of 127 keeps the scan
+and `serde_json` on the same side of that line.
+
+`4 * max_depth + 8` is the budget underneath the cap. A component chain
+of length `max_depth` has container depth `2 * max_depth + 1` (the root
+object, one array and one object per level). Licenses, hashes, and the
+metadata object need further containers, so the multiplier is 4 and the
+document skeleton has 8 levels of budget. At the default flag that
+product is 136, and the cap brings it back to 127. A pure component
+chain of length 32 has container depth 65, so it fails the component
 check, not the JSON check. A container bomb past the ceiling is rejected
-by the scan and never becomes a `serde_json::Value`. After the scan, the
-deserializer's recursion limit is raised to the ceiling, so a run that
-raises `--max-depth` is not capped by serde_json's default of 128.
+by the scan and never becomes a `serde_json::Value`. A `--max-depth`
+high enough that a component chain no longer fits in 127 containers is
+rejected by the JSON check first. That is the v0.1 bound.
 
 ### Duplicate object keys
 
