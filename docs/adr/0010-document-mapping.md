@@ -32,7 +32,8 @@ A valid purl uses ADR 0005 and ADR 0009. The version pair is
 `(purl version, epoch qualifier)`. A purl with no version uses the
 component's `version` string, or the empty string when that field is
 absent. When both are present and they differ, the purl version wins.
-The component `version` is not stored as a second version.
+The component `version` is not stored as a second version. The document
+gets one warning on that component key, kind `version-mismatch`.
 
 An invalid purl, or a missing purl, uses `group` plus `name`. A missing
 `group` is the empty string. A missing `name` on that fallback rejects
@@ -118,6 +119,7 @@ one warning.
 | `duplicate-bom-ref` | Two components share a `bom-ref`. |
 | `role-unknown` | No root component, or no `dependencies` field. The role is `unknown`. |
 | `conflicting-attributes` | The same key and version carried different attributes. |
+| `version-mismatch` | The component `version` and the purl version differ. The purl version is stored. |
 
 Warnings do not change the error returned for a valid document. They do
 not change the exit code (ADR 0005).

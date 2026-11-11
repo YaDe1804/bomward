@@ -251,6 +251,7 @@ struct ParsedComponent {
     attributes: VersionAttributes,
     bom_ref: Option<String>,
     invalid_purl: bool,
+    version_mismatch: bool,
 }
 
 struct Assembler<'a> {
@@ -325,6 +326,12 @@ impl Assembler<'_> {
             self.warnings.insert(Warning {
                 key: Some(parsed.key.clone()),
                 kind: WarningKind::InvalidPurl,
+            });
+        }
+        if parsed.version_mismatch {
+            self.warnings.insert(Warning {
+                key: Some(parsed.key.clone()),
+                kind: WarningKind::VersionMismatch,
             });
         }
         if let Some(bom_ref) = &parsed.bom_ref {
@@ -493,6 +500,13 @@ fn component_fields(object: &Map<String, Value>) -> Result<ParsedComponent, Erro
         _ => None,
     };
     let invalid_purl = object.contains_key("purl") && parsed_purl.is_none();
+    let component_version = object.get("version").and_then(Value::as_str);
+    let version_mismatch = parsed_purl.as_ref().is_some_and(|purl| {
+        match (purl.version.as_deref(), component_version) {
+            (Some(purl_version), Some(component_version)) => purl_version != component_version,
+            _ => false,
+        }
+    });
     let key = match &parsed_purl {
         Some(purl) => purl.key.clone(),
         None => name_key(object)?,
@@ -511,6 +525,7 @@ fn component_fields(object: &Map<String, Value>) -> Result<ParsedComponent, Erro
             .and_then(Value::as_str)
             .map(str::to_owned),
         invalid_purl,
+        version_mismatch,
     })
 }
 

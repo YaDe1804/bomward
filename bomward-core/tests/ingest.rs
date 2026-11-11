@@ -597,6 +597,42 @@ fn conflicting_attributes_are_united_and_warned() -> Result<(), String> {
 }
 
 #[test]
+fn a_component_version_that_differs_from_the_purl_warns() -> Result<(), String> {
+    let mismatched = read_default(
+        br#"{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"name":"app","version":"1","purl":"pkg:generic/app@1"}},"components":[{"name":"left-pad","version":"9.9.9","purl":"pkg:npm/left-pad@1.2.0"}],"dependencies":[]}"#,
+    )
+    .map_err(|error| error.to_string())?;
+    let (_, component) = find(&mismatched, "left-pad")?;
+    let stored = component
+        .versions
+        .keys()
+        .next()
+        .map(|version| version.version.as_str())
+        .ok_or("missing version")?;
+    if stored != "1.2.0" {
+        return Err(stored.to_owned());
+    }
+    if mismatched.warnings.len() != 1 {
+        return Err(format!("{:?}", mismatched.warnings));
+    }
+    let warning = mismatched.warnings.first().ok_or("missing warning")?;
+    if warning.kind != WarningKind::VersionMismatch
+        || warning.kind.id() != "version-mismatch"
+        || warning.key.as_ref().map(key_name) != Some("left-pad")
+    {
+        return Err(format!("{warning:?}"));
+    }
+    let matched = read_default(
+        br#"{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"name":"app","version":"1","purl":"pkg:generic/app@1"}},"components":[{"name":"left-pad","version":"1.2.0","purl":"pkg:npm/left-pad@1.2.0"}],"dependencies":[]}"#,
+    )
+    .map_err(|error| error.to_string())?;
+    if !matched.warnings.is_empty() {
+        return Err(format!("{:?}", matched.warnings));
+    }
+    Ok(())
+}
+
+#[test]
 fn hostile_names_are_stored_unchanged() -> Result<(), String> {
     let hostile = "a\n\u{001b}*_`|\u{007f}";
     let long = "n".repeat(8_000);

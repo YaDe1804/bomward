@@ -269,6 +269,10 @@ pub enum WarningKind {
     /// The same key and version carried different attributes.
     /// Id: `conflicting-attributes`.
     ConflictingAttributes,
+    /// The component `version` and the purl version differ. Id: `version-mismatch`.
+    ///
+    /// The stored version is the purl version.
+    VersionMismatch,
 }
 
 impl WarningKind {
@@ -281,6 +285,7 @@ impl WarningKind {
             Self::DuplicateBomRef => "duplicate-bom-ref",
             Self::RoleUnknown => "role-unknown",
             Self::ConflictingAttributes => "conflicting-attributes",
+            Self::VersionMismatch => "version-mismatch",
         }
     }
 
@@ -293,6 +298,7 @@ impl WarningKind {
             Self::DuplicateBomRef => "duplicate bom-ref; kept the first component",
             Self::RoleUnknown => "component role is unknown",
             Self::ConflictingAttributes => "same version carried different attributes",
+            Self::VersionMismatch => "component version differs from purl version",
         }
     }
 }
