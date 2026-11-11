@@ -85,7 +85,7 @@ bomward diff <OLD> <NEW> [--policy <FILE>] [--format <terminal|markdown|json>] [
 | `--format` | `terminal` (default), `markdown`, or `json`. |
 | `--max-file-bytes` | Max size of one input file. Default `33554432`. |
 | `--max-components` | Max component objects, including nested ones. Default `100000`. |
-| `--max-depth` | Max nesting depth. Default `32`. |
+| `--max-depth` | Max nesting of `components` inside `components`, and of JSON arrays and objects while parsing. Does not limit dependency-graph path length. Default `32`. |
 
 `--version` and `--help` exit 0.
 
@@ -133,7 +133,10 @@ unsupported specVersion {found}; supported versions: 1.4, 1.5, 1.6, 1.7
 
 Limits for hostile files are defaults from [ADR 0006](adr/0006-untrusted-input.md):
 32 MiB per file (`--max-file-bytes`), 100,000 components
-(`--max-components`), and nesting depth 32 (`--max-depth`). A violation
+(`--max-components`), and nesting depth 32 (`--max-depth`). Depth covers
+`components` nested inside `components`, and JSON arrays and objects
+while parsing. It does not cover how long a dependency chain is. A
+cycle in `dependencies` is stored; it is not an error. A violation
 names the limit, the value that was found, and the flag.
 
 ## Policy sketch

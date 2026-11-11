@@ -32,11 +32,14 @@ That is a denial-of-service against the CI job, or a panic that a caller
 might misread as a pass.
 
 Mitigation: the defaults reject a file larger than 32 MiB, a document
-with more than 100,000 components, or nesting deeper than 32. Each
+with more than 100,000 components, or nesting deeper than 32. Nesting
+means `components` inside `components`, and JSON arrays and objects
+while parsing. It does not mean the length of a dependency chain. Each
 default has a flag (`--max-file-bytes`, `--max-components`,
 `--max-depth`). A violation names the limit, the value found, and that
-flag, and exits 2. A dependency cycle is rejected the same way and has
-no flag. Library code does not panic.
+flag, and exits 2. A dependency cycle is stored as data. Every graph
+walk keeps a visited set, so a cycle cannot spin. Library code does
+not panic.
 `unsafe` is forbidden, so a parse bug cannot become a memory-safety bug
 inside bomward.
 

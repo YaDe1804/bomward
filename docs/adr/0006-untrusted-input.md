@@ -24,8 +24,14 @@ bomward is static.
   | --- | --- | --- |
   | one input file | 32 MiB (33,554,432 bytes) | `--max-file-bytes` |
   | component objects, including nested ones | 100,000 | `--max-components` |
-  | nesting of `components` and of the dependency graph | 32 | `--max-depth` |
+  | nesting of `components` inside `components`, and JSON nesting while parsing | 32 | `--max-depth` |
 
+- `--max-depth` does **not** limit the path length of the dependency
+  graph. A path is bounded by the component count, because every walk
+  carries a visited set and stops when it meets a component it has
+  already seen.
+- A cycle in the dependency graph is data. It is stored with the edges
+  that declared it. It is not an input error and it has no flag.
 - A limit violation is an error (exit 2). The message names the limit,
   the value that was found, and the flag that raises it:
 
@@ -35,8 +41,8 @@ bomward is static.
   nesting depth {found} exceeds limit {limit} (--max-depth)
   ```
 
-- Reject a cycle in the dependency graph. A cycle has no flag.
-- Over-limit and cyclic input does not panic and does not truncate.
+- Over-limit input does not panic and does not truncate. A document that
+  only contains a cycle is accepted, up to the component-count limit.
 - Do not write a SBOM string into terminal or Markdown output unchanged.
   Encode U+0000–U+001F and U+007F as `\u{XXXX}` (four uppercase hex
   digits). That includes tab, newline, and ESC.
@@ -53,8 +59,22 @@ A single run may raise a limit with the flag for that limit.
 
 32 MiB and 100,000 components are enough for a large application SBOM
 and small enough that a CI job can refuse a pathological file quickly.
-Depth 32 covers real component trees and stops a nested bomb. Cycle
-detection stops a graph walk that would otherwise not terminate.
+Depth 32 covers real `components` trees and stops a nested JSON bomb.
+A visited set stops a graph walk that would otherwise not terminate, so
+a cycle does not have to be an error. Real lockfiles contain cycles
+(workspaces that depend on each other, optional peer edges). Rejecting
+them would fail a review that has nothing to do with the policy.
+
+Checked against the CycloneDX JSON schemas on 2026-11-11. In JSON 1.4,
+1.5, 1.6, and 1.7, `dependencies` is a flat adjacency list. Each item is
+`{ "ref": "<bom-ref>", "dependsOn": ["<bom-ref>", ...] }`. The
+`dependsOn` entries are strings. They are not nested dependency objects,
+so a long chain or a cycle does not add JSON depth. The XML schema has
+historically allowed nested `dependency` elements; CycloneDX
+specification issue 146 records that the JSON schema and the XSD
+disagree. v0.1 reads JSON only (ADR 0004), so that XML shape is out of
+scope. A JSON array element inside `dependsOn` that is not a string is
+an invalid document, not a depth violation and not a cycle.
 
 Escaping, rather than stripping, keeps the review honest: the reader can
 see that the name contained a control character. Stripping would hide
@@ -76,6 +96,11 @@ the tool inside the files the operator named.
 
 - Ingest enforces the limits before and during the parse, so a huge
   file is refused without holding the whole payload past the cap.
+- `--max-depth` counts two things: how deep `components` is nested
+  inside `components`, and how deep JSON arrays and objects are nested
+  while parsing. It does not count edges in `dependencies`.
+- Graph walks in this crate and in later diff code use a visited set.
+  They do not reject the document because a cycle exists.
 - The report module owns escaping. Callers pass untrusted strings
   through that module and do not format them themselves.
 - `bomward-core` must not gain a HTTP or process dependency. The
