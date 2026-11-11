@@ -24,7 +24,10 @@ use clap::{Parser, Subcommand, ValueEnum};
 SBOM review gate for pull requests and releases.
 
 The diff subcommand compares two CycloneDX JSON documents:
-  bomward diff <OLD> <NEW> [--policy <FILE>] [--format <terminal|markdown|json>]
+  bomward diff <OLD> <NEW> [--policy <FILE>] [--format <terminal|markdown|json>] [--max-file-bytes N] [--max-components N] [--max-depth N]
+
+Without --policy the run is report-only and exits 0. Every output then includes the sentence \"No policy was applied.\"
+Limits default to 33554432 bytes, 100000 components, and depth 32. A violation names the limit, the value found, and the flag.
 
 Status: pre-release, not usable yet. diff exits 2.",
     arg_required_else_help = true
@@ -43,11 +46,29 @@ enum Command {
         /// Candidate `CycloneDX` JSON document.
         new: PathBuf,
         /// Policy file used to judge the diff.
+        ///
+        /// Omit this flag for report-only mode, which exits 0.
+        /// Every output then includes the sentence "No policy was applied."
         #[arg(long, value_name = "FILE")]
         policy: Option<PathBuf>,
         /// Report format.
         #[arg(long, value_enum, default_value = "terminal")]
         format: OutputFormat,
+        /// Maximum size in bytes of one input file. Default: 33554432 (32 MiB).
+        ///
+        /// A violation names this limit, the size that was found, and `--max-file-bytes`.
+        #[arg(long, default_value_t = 33_554_432)]
+        max_file_bytes: u64,
+        /// Maximum number of component objects, including nested components. Default: 100000.
+        ///
+        /// A violation names this limit, the count that was found, and `--max-components`.
+        #[arg(long, default_value_t = 100_000)]
+        max_components: u64,
+        /// Maximum nesting depth of components and the dependency graph. Default: 32.
+        ///
+        /// A violation names this limit, the depth that was found, and `--max-depth`.
+        #[arg(long, default_value_t = 32)]
+        max_depth: u32,
     },
 }
 
@@ -80,10 +101,25 @@ fn run(cli: Cli) -> Result<()> {
             new,
             policy,
             format,
-        } => run_diff(&old, &new, policy.as_deref(), format),
+            max_file_bytes,
+            max_components,
+            max_depth,
+        } => run_diff(
+            &old,
+            &new,
+            policy.as_deref(),
+            format,
+            (max_file_bytes, max_components, max_depth),
+        ),
     }
 }
 
-fn run_diff(_old: &Path, _new: &Path, _policy: Option<&Path>, _format: OutputFormat) -> Result<()> {
+fn run_diff(
+    _old: &Path,
+    _new: &Path,
+    _policy: Option<&Path>,
+    _format: OutputFormat,
+    _limits: (u64, u64, u32),
+) -> Result<()> {
     Err(CoreError::NotImplemented.into())
 }

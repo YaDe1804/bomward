@@ -40,7 +40,13 @@ Out of scope for v0.1:
   until an ADR adds it.
 
 An unsupported document is an input error (exit 2), not a best-effort
-parse.
+parse. The error names the `specVersion` that was found and the versions
+this decision allows. The found value is the word `missing` when the
+field is absent. The text is:
+
+```text
+unsupported specVersion {found}; supported versions: 1.4, 1.5, 1.6, 1.7
+```
 
 ## Rationale
 
@@ -63,6 +69,8 @@ non-goal named in the foundation brief.
 ## Consequences
 
 - Ingest rejects XML even when the contents are CycloneDX.
+- An unsupported or missing `specVersion` uses the error text above, so
+  a CI log shows both the value in the file and the allowed list.
 - AP1's parser ADR is limited to JSON for these four versions.
 - Adding 1.8, XML, or SPDX requires a new ADR.
 - How the bytes are parsed (a serde model in this repository, or an

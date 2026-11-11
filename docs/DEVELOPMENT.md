@@ -9,7 +9,7 @@ Public product contract: [SPEC.md](SPEC.md). Decisions: [adr/](adr/).
 | `bomward-core` | Library. `ingest`, `model`, `diff`, `policy`, `report`. |
 | `bomward-cli` | Binary `bomward`. |
 | `docs/adr` | Architecture decision records. |
-| `.github/workflows/ci.yml` | Format, Clippy, tests, `cargo-deny`, `cargo-audit`. |
+| `.github/workflows/ci.yml` | Format, Clippy, tests, MSRV, `cargo-deny`, `cargo-audit`. |
 | `deny.toml` | License, advisory, and source policy for this repository. |
 
 Data flow: `ingest` → `model` → `diff` → `policy` → `report`.
@@ -17,11 +17,26 @@ Data flow: `ingest` → `model` → `diff` → `policy` → `report`.
 ## Toolchain
 
 - Rust stable, edition 2024, with `rustfmt` and `clippy` (`rust-toolchain.toml`).
-- MSRV is **1.99**. That is the stable release this foundation was built and
-  tested with (`rustc 1.99.0`, 2026-09-28). `rust-version` in the workspace
-  `Cargo.toml` is `1.99`. CI follows the `stable` channel. Older compilers
-  are not claimed.
 - `cargo-nextest`, `cargo-deny`, and `cargo-audit` on the PATH for the gate.
+
+## MSRV
+
+The MSRV is `workspace.package.rust-version` in the root `Cargo.toml`.
+It is **1.99**, the stable release this foundation was built with
+(`rustc 1.99.0`, 2026-09-28).
+
+- Code and dependencies build and pass tests on that version. Do not use
+  newer language features or newer standard-library APIs.
+- `rust-toolchain.toml` stays on `stable`. The fmt, clippy, test, deny,
+  and audit jobs follow that channel.
+- The `msrv` job reads `rust-version` from `Cargo.toml` and installs that
+  toolchain. It runs `cargo build --locked --all-targets` and
+  `cargo nextest run --locked`. It does not keep a second copy of the
+  number.
+- Raising the MSRV is a deliberate change in the same commit as this
+  section: a dependency's floor, or an edition feature the project
+  chooses to require. Do not raise it because stable moved.
+- Do not claim a lower MSRV than the dependency closure allows.
 
 Crate versions are taken from crates.io via `cargo add`, not from memory.
 The foundation closure is:

@@ -35,6 +35,10 @@ fn help_shows_diff_command_and_options() -> Result<(), Box<dyn std::error::Error
     assert!(stdout.contains("terminal"), "{stdout}");
     assert!(stdout.contains("markdown"), "{stdout}");
     assert!(stdout.contains("json"), "{stdout}");
+    assert!(stdout.contains("--max-file-bytes"), "{stdout}");
+    assert!(stdout.contains("--max-components"), "{stdout}");
+    assert!(stdout.contains("--max-depth"), "{stdout}");
+    assert!(stdout.contains("No policy was applied."), "{stdout}");
     Ok(())
 }
 
@@ -48,6 +52,10 @@ fn diff_help_shows_planned_options() -> Result<(), Box<dyn std::error::Error>> {
     assert!(stdout.contains("--format"), "{stdout}");
     assert!(stdout.contains("<OLD>"), "{stdout}");
     assert!(stdout.contains("<NEW>"), "{stdout}");
+    assert!(stdout.contains("--max-file-bytes"), "{stdout}");
+    assert!(stdout.contains("--max-components"), "{stdout}");
+    assert!(stdout.contains("--max-depth"), "{stdout}");
+    assert!(stdout.contains("No policy was applied."), "{stdout}");
     Ok(())
 }
 

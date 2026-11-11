@@ -2,6 +2,7 @@
 
 //! Normalized components and their identities.
 //!
-//! Identity is the Package URL without its version, or `group` plus `name`
-//! when no Package URL is present. `bom-ref` is not an identity. The model
-//! types arrive with ingest.
+//! Identity is the Package URL without its version and without
+//! version-dependent qualifiers. Each key holds a set of versions. A missing
+//! or invalid Package URL uses `group` plus `name`; an invalid one also
+//! warns. `bom-ref` is not an identity. The model types arrive with ingest.

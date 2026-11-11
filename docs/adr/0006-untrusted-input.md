@@ -17,14 +17,26 @@ bomward is static.
 - No network access, no shell, no execution of foreign code.
 - Open only the paths the user passed. Never build a path, URL, or
   command from a string inside a SBOM or a policy file.
-- Reject a single input file larger than 32 MiB (33,554,432 bytes).
-- Reject a document with more than 100,000 component objects, counting
-  nested components.
-- Reject nesting deeper than 32. Depth counts nested `components` and
-  the dependency-graph walk.
-- Reject a cycle in the dependency graph.
-- Over-limit and cyclic input is an error (exit 2). The library does
-  not panic and does not truncate.
+- The size, component-count, and depth limits have defaults. Each one
+  is overridable with a flag on `diff`:
+
+  | Limit | Default | Flag |
+  | --- | --- | --- |
+  | one input file | 32 MiB (33,554,432 bytes) | `--max-file-bytes` |
+  | component objects, including nested ones | 100,000 | `--max-components` |
+  | nesting of `components` and of the dependency graph | 32 | `--max-depth` |
+
+- A limit violation is an error (exit 2). The message names the limit,
+  the value that was found, and the flag that raises it:
+
+  ```text
+  file size {found} exceeds limit {limit} (--max-file-bytes)
+  component count {found} exceeds limit {limit} (--max-components)
+  nesting depth {found} exceeds limit {limit} (--max-depth)
+  ```
+
+- Reject a cycle in the dependency graph. A cycle has no flag.
+- Over-limit and cyclic input does not panic and does not truncate.
 - Do not write a SBOM string into terminal or Markdown output unchanged.
   Encode U+0000–U+001F and U+007F as `\u{XXXX}` (four uppercase hex
   digits). That includes tab, newline, and ESC.
@@ -34,7 +46,8 @@ bomward is static.
 - Fixtures are inert documents written for the tests. No malware
   samples and no copied malicious packages.
 
-These limits are the v0.1 contract. Changing a number is an ADR change.
+The defaults are the v0.1 contract. Changing a default is an ADR change.
+A single run may raise a limit with the flag for that limit.
 
 ## Rationale
 
@@ -68,5 +81,8 @@ the tool inside the files the operator named.
 - `bomward-core` must not gain a HTTP or process dependency. The
   dependency set in `deny.toml` stays on crates.io and on the license
   allow-list; a client such as `reqwest` is a new ADR, not a `cargo add`.
-- The numbers above are reviewable. If a real SBOM exceeds them, raise
-  the limit in this ADR rather than special-casing one file.
+- The numbers above are the defaults. A real SBOM that exceeds one of
+  them is passed with that run's flag. Changing the default for every
+  run is an amendment of this ADR.
+- The violation text is part of the contract. AP1 uses the three
+  sentences above and does not invent a second shape.

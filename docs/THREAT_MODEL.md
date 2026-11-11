@@ -31,9 +31,12 @@ A SBOM can be huge, deeply nested, cyclic, or full of duplicate objects.
 That is a denial-of-service against the CI job, or a panic that a caller
 might misread as a pass.
 
-Mitigation: reject a file larger than 32 MiB, a document with more than
-100,000 components, nesting deeper than 32, or a dependency cycle. The
-failure is a typed error and exit code 2. Library code does not panic.
+Mitigation: the defaults reject a file larger than 32 MiB, a document
+with more than 100,000 components, or nesting deeper than 32. Each
+default has a flag (`--max-file-bytes`, `--max-components`,
+`--max-depth`). A violation names the limit, the value found, and that
+flag, and exits 2. A dependency cycle is rejected the same way and has
+no flag. Library code does not panic.
 `unsafe` is forbidden, so a parse bug cannot become a memory-safety bug
 inside bomward.
 
