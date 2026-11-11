@@ -98,7 +98,11 @@ the tool inside the files the operator named.
   file is refused without holding the whole payload past the cap.
 - `--max-depth` counts two things: how deep `components` is nested
   inside `components`, and how deep JSON arrays and objects are nested
-  while parsing. It does not count edges in `dependencies`.
+  while parsing. It does not count edges in `dependencies`. Component
+  nesting is compared with the flag value. JSON container nesting is
+  compared with the ceiling in [ADR 0008](0008-cyclonedx-parser.md),
+  which is wide enough for a component tree of that depth. Both
+  failures use the nesting-depth sentence above.
 - Graph walks in this crate and in later diff code use a visited set.
   They do not reject the document because a cycle exists.
 - The report module owns escaping. Callers pass untrusted strings
