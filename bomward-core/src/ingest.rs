@@ -21,8 +21,8 @@ use std::path::Path;
 use crate::error::{DocumentError, Error, LimitExceeded, LimitKind};
 use crate::limits::Limits;
 use crate::model::{
-    Component, ComponentKey, DependencyRole, Document, VersionAttributes, VersionId, Warning,
-    WarningKind,
+    Component, ComponentKey, DependencyRole, Document, GraphNode, Version, VersionAttributes,
+    VersionId, Warning, WarningKind,
 };
 use crate::purl::{ParsedPurl, parse_purl};
 
@@ -518,9 +518,9 @@ struct ParsedComponent {
 struct Assembler {
     components: BTreeMap<ComponentKey, Component>,
     warnings: BTreeSet<Warning>,
-    refs: BTreeMap<String, ComponentKey>,
-    root_key: Option<ComponentKey>,
-    dependencies: BTreeMap<ComponentKey, BTreeSet<ComponentKey>>,
+    refs: BTreeMap<String, GraphNode>,
+    root: Option<GraphNode>,
+    dependencies: BTreeMap<GraphNode, BTreeSet<GraphNode>>,
 }
 
 fn assemble(inventory: decode::Inventory, duplicate_key: bool) -> Result<Document, Error> {
@@ -528,7 +528,7 @@ fn assemble(inventory: decode::Inventory, duplicate_key: bool) -> Result<Documen
         components: BTreeMap::new(),
         warnings: BTreeSet::new(),
         refs: BTreeMap::new(),
-        root_key: None,
+        root: None,
         dependencies: BTreeMap::new(),
     };
     if let Some(root) = inventory.metadata {
@@ -573,6 +573,10 @@ impl Assembler {
                 kind: WarningKind::VersionMismatch,
             });
         }
+        let node = GraphNode {
+            key: parsed.key.clone(),
+            version: parsed.version.clone(),
+        };
         if let Some(bom_ref) = &parsed.bom_ref {
             if self.refs.contains_key(bom_ref) {
                 self.warnings.insert(Warning {
@@ -580,11 +584,11 @@ impl Assembler {
                     kind: WarningKind::DuplicateBomRef,
                 });
             } else {
-                self.refs.insert(bom_ref.clone(), parsed.key.clone());
+                self.refs.insert(bom_ref.clone(), node.clone());
             }
         }
         if is_root {
-            self.root_key = Some(parsed.key.clone());
+            self.root = Some(node);
         }
         self.merge(parsed.key, parsed.version, parsed.attributes);
         for child in children {
@@ -597,10 +601,13 @@ impl Assembler {
         let component = self.components.entry(key.clone()).or_default();
         match component.versions.entry(version) {
             Entry::Vacant(slot) => {
-                slot.insert(attributes);
+                slot.insert(Version {
+                    attributes,
+                    role: DependencyRole::Unknown,
+                });
             }
             Entry::Occupied(mut slot) => {
-                if slot.get_mut().absorb(&attributes) {
+                if slot.get_mut().attributes.absorb(&attributes) {
                     self.warnings.insert(Warning {
                         key: Some(key),
                         kind: WarningKind::ConflictingAttributes,
@@ -612,7 +619,7 @@ impl Assembler {
 
     fn read_dependencies(&mut self, entries: Vec<decode::RawDependency>) {
         for entry in entries {
-            let Some(source_key) = self.refs.get(&entry.source).cloned() else {
+            let Some(source) = self.refs.get(&entry.source).cloned() else {
                 self.warnings.insert(Warning {
                     key: None,
                     kind: WarningKind::OrphanRef,
@@ -623,21 +630,21 @@ impl Assembler {
             let mut dangling = false;
             for target in entry.targets {
                 match self.refs.get(&target) {
-                    Some(key) => {
-                        resolved.insert(key.clone());
+                    Some(node) => {
+                        resolved.insert(node.clone());
                     }
                     None => dangling = true,
                 }
             }
             if dangling {
                 self.warnings.insert(Warning {
-                    key: Some(source_key.clone()),
+                    key: Some(source.key.clone()),
                     kind: WarningKind::OrphanRef,
                 });
             }
             if !resolved.is_empty() {
                 self.dependencies
-                    .entry(source_key)
+                    .entry(source)
                     .or_default()
                     .extend(resolved);
             }
@@ -645,7 +652,7 @@ impl Assembler {
     }
 
     fn classify(&mut self, dependencies_present: bool) {
-        let Some(root_key) = self.root_key.clone() else {
+        let Some(root) = self.root.clone() else {
             self.warnings.insert(Warning {
                 key: None,
                 kind: WarningKind::RoleUnknown,
@@ -659,21 +666,15 @@ impl Assembler {
             });
             return;
         }
-        if let Some(component) = self.components.get_mut(&root_key) {
-            component.role = DependencyRole::Root;
-        }
-        let directs = self
-            .dependencies
-            .get(&root_key)
-            .cloned()
-            .unwrap_or_default();
+        set_role(&mut self.components, &root, DependencyRole::Root);
+        let directs = self.dependencies.get(&root).cloned().unwrap_or_default();
         for target in &directs {
             set_role(&mut self.components, target, DependencyRole::Direct);
         }
         // The visited set is what stops a cycle. Path length is not a limit.
-        let mut stack: Vec<ComponentKey> = directs.into_iter().collect();
+        let mut stack: Vec<GraphNode> = directs.into_iter().collect();
         let mut visited = BTreeSet::new();
-        visited.insert(root_key);
+        visited.insert(root);
         while let Some(node) = stack.pop() {
             if !visited.insert(node.clone()) {
                 continue;
@@ -693,14 +694,17 @@ impl Assembler {
 
 fn set_role(
     components: &mut BTreeMap<ComponentKey, Component>,
-    key: &ComponentKey,
+    node: &GraphNode,
     role: DependencyRole,
 ) {
-    let Some(component) = components.get_mut(key) else {
+    let Some(component) = components.get_mut(&node.key) else {
         return;
     };
-    if component.role == DependencyRole::Unknown {
-        component.role = role;
+    let Some(version) = component.versions.get_mut(&node.version) else {
+        return;
+    };
+    if version.role == DependencyRole::Unknown || role == DependencyRole::Root {
+        version.role = role;
     }
 }
 

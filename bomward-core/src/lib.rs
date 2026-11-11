@@ -25,6 +25,6 @@ pub use error::{DocumentError, Error, LimitExceeded, LimitKind, UnsupportedDepth
 pub use ingest::{read_bytes, read_path};
 pub use limits::Limits;
 pub use model::{
-    Component, ComponentKey, ContentHash, DependencyRole, Document, VersionAttributes, VersionId,
-    Warning, WarningKind,
+    Component, ComponentKey, ContentHash, DependencyRole, Document, GraphNode, Version,
+    VersionAttributes, VersionId, Warning, WarningKind,
 };

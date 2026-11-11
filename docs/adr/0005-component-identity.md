@@ -82,7 +82,9 @@ still rejects the document (exit 2). A missing `purl` uses the same
 `group` plus `name` key and does not warn.
 
 `bom-ref` is not a key. It may be used only to walk the dependency graph
-**inside the document that declared it**.
+**inside the document that declared it**. A node of that graph is the
+pair `(key, version)`, not the key alone. Two versions of one package
+are two nodes and can have two roles.
 
 ## Rationale
 
@@ -129,7 +131,8 @@ keeps the bad string visible in the report.
   pieces, and builds the version set.
 - The diff joins on this key and never on `bom-ref`. It compares version
   sets, then attributes of versions that are in both sets.
-- Direct versus transitive still uses each document's own graph.
+- Direct versus transitive still uses each document's own graph. The
+  node is one version of a key. The role is stored on that version.
 - Every report format has a warning count and a warning list, sorted by
   key then by message, so the output stays deterministic.
 - The warning text for this case is `invalid purl; fell back to group and name`.

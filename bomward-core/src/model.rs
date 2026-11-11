@@ -6,7 +6,8 @@
 //! version-dependent qualifiers ([ADR 0005](https://github.com/YaDe1804/bomward/blob/main/docs/adr/0005-component-identity.md),
 //! ADR 0009). Each key holds a set of versions. A missing or invalid Package
 //! URL uses `group` plus `name`. An invalid one also warns. `bom-ref` is not
-//! a field of this model.
+//! a field of this model. A graph node is one key together with one version,
+//! and the role is stored on that version.
 //!
 //! [`Document::to_canonical_json`] encodes the model for tests. That encoding
 //! is deterministic and it is **not** a public contract: field names, key
@@ -19,17 +20,17 @@ use serde::Serialize;
 
 /// One `CycloneDX` document after ingest.
 ///
-/// Components are keyed by [`ComponentKey`]. The dependency graph uses those
-/// same keys. `bom-ref` is not stored.
+/// Components are keyed by [`ComponentKey`]. The dependency graph uses
+/// [`GraphNode`], a key plus one version. `bom-ref` is not stored.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Document {
     /// Components in key order.
     pub components: BTreeMap<ComponentKey, Component>,
     /// Edges declared by `dependencies`, after dangling refs are dropped.
     ///
-    /// A key is present only when it has at least one resolved target.
-    /// Cycles are stored as ordinary edges.
-    pub dependencies: BTreeMap<ComponentKey, BTreeSet<ComponentKey>>,
+    /// A node is present only when it has at least one resolved target.
+    /// Cycles are stored as ordinary edges. Each node is one version.
+    pub dependencies: BTreeMap<GraphNode, BTreeSet<GraphNode>>,
     /// Warnings, sorted by key and then by [`WarningKind`].
     pub warnings: Vec<Warning>,
 }
@@ -58,13 +59,13 @@ impl Serialize for Document {
                 versions: component
                     .versions
                     .iter()
-                    .map(|(version, attributes)| CanonicalVersion {
+                    .map(|(version, stored)| CanonicalVersion {
                         version: &version.version,
                         epoch: version.epoch.as_deref(),
-                        attributes,
+                        role: stored.role,
+                        attributes: &stored.attributes,
                     })
                     .collect(),
-                role: component.role,
             })
             .collect::<Vec<_>>();
         let dependencies = self
@@ -95,20 +96,20 @@ struct CanonicalDocument<'a> {
 struct CanonicalComponent<'a> {
     key: &'a ComponentKey,
     versions: Vec<CanonicalVersion<'a>>,
-    role: DependencyRole,
 }
 
 #[derive(Serialize)]
 struct CanonicalVersion<'a> {
     version: &'a str,
     epoch: Option<&'a str>,
+    role: DependencyRole,
     attributes: &'a VersionAttributes,
 }
 
 #[derive(Serialize)]
 struct CanonicalEdges<'a> {
-    from: &'a ComponentKey,
-    to: Vec<&'a ComponentKey>,
+    from: &'a GraphNode,
+    to: Vec<&'a GraphNode>,
 }
 
 /// Identity of a component inside one review.
@@ -143,10 +144,29 @@ pub enum ComponentKey {
 /// One component and the versions observed for its key.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
 pub struct Component {
-    /// Versions in `(version, epoch)` order.
-    pub versions: BTreeMap<VersionId, VersionAttributes>,
-    /// Where this component sits in the document's graph.
+    /// Versions in `(version, epoch)` order. Each version has its own role.
+    pub versions: BTreeMap<VersionId, Version>,
+}
+
+/// One observed version and where that version sits in the graph.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+pub struct Version {
+    /// Attributes stored for this version.
+    pub attributes: VersionAttributes,
+    /// Graph role of this version. Other versions of the same key may differ.
     pub role: DependencyRole,
+}
+
+/// A dependency-graph node: one component key and one of its versions.
+///
+/// `bom-ref` resolves to this pair while a single document is read. It is
+/// not stored.
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize)]
+pub struct GraphNode {
+    /// Identity without the version.
+    pub key: ComponentKey,
+    /// The version this node refers to.
+    pub version: VersionId,
 }
 
 /// The version half of a version-set element.
@@ -223,7 +243,7 @@ pub struct ContentHash {
     pub content: String,
 }
 
-/// How a component relates to the root of this document.
+/// How one version relates to the root of this document.
 ///
 /// AP2 decides how a report prints these. Ingest only records them.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Serialize)]

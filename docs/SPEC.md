@@ -44,12 +44,12 @@ component `version` and its purl version differ, the purl version is
 stored and the document warns `version-mismatch`. A JSON object that
 repeats a key keeps the last value and warns `duplicate-key`.
 
-Each change records whether the component is direct, transitive, the root,
-or unknown in the document that contains it. That classification uses the
-dependency graph inside a single document.
+Each change records whether that version is direct, transitive, the root,
+or unknown in the document that contains it. The graph node is one key
+together with one version. Two versions of one package can have two roles.
 [ADR 0010](adr/0010-document-mapping.md) defines the four roles. A document
 with no `metadata.component`, or with no `dependencies` field, marks every
-component unknown and counts one warning, `role-unknown`. `scope` in a
+version unknown and counts one warning, `role-unknown`. `scope` in a
 component is only the CycloneDX field. `bom-ref` is never compared
 across the two documents.
 

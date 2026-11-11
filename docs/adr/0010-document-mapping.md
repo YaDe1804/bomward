@@ -70,9 +70,10 @@ Identical repeats do not warn. A difference is never dropped.
 ### The dependency graph
 
 The graph is the `dependencies` array, stored as an adjacency list from
-component key to component key. `bom-ref` is used only while reading
-this one document. It is not a field of the public model, and no API
-that takes two documents accepts a `bom-ref`.
+`(component key, version)` to `(component key, version)`. `bom-ref` is
+resolved to that pair while reading this one document. It is not a field
+of the public model, and no API that takes two documents accepts a
+`bom-ref`.
 
 `dependencies` is the flat list from ADR 0006. Each `dependsOn` entry
 must be a string. A non-string is an invalid document.
@@ -80,24 +81,27 @@ must be a string. A non-string is an invalid document.
 A `ref` or a `dependsOn` string that matches no component is a warning,
 kind `orphan-ref`, and produces no edge. Several dangling strings on the
 same source collapse to one warning. A duplicated `bom-ref` keeps the
-first component for resolution; the document gets one warning, kind
-`duplicate-bom-ref`. The later component is still stored under its own
-key.
+first `(key, version)` for resolution; the document gets one warning,
+kind `duplicate-bom-ref`. The later component is still stored under its
+own key and version.
 
 Edges are a set. A repeated pair is one edge. A cycle, including a
 self-loop, is stored as those edges.
 
 Classification of a component, for a later diff:
 
+The role is a field of the version, not of the key. Two versions of one
+package are two nodes.
+
 | Role | Meaning |
 | --- | --- |
-| `root` | The `metadata.component` object. |
-| `direct` | Its `bom-ref` is in the `dependsOn` list of the dependency entry whose `ref` is the root's `bom-ref`. |
-| `transitive` | Reachable from a direct dependency. The walk keeps a visited set and stops on a key it has already seen. |
-| `unknown` | Not the root and not reachable. |
+| `root` | The version of the `metadata.component` object. |
+| `direct` | Its `bom-ref` is in the `dependsOn` list of the dependency entry whose `ref` is the root version's `bom-ref`. |
+| `transitive` | Reachable from a direct version. The walk keeps a visited set of `(key, version)` and stops on a node it has already seen. |
+| `unknown` | Not the root version and not reachable. |
 
 When `metadata.component` is absent, or the `dependencies` field is
-absent, every component's role is `unknown` and the document gets one
+absent, every version's role is `unknown` and the document gets one
 warning, kind `role-unknown`. An empty `dependencies` array is present:
 the root's role is `root`, and nothing is direct. How AP2 prints these
 roles is not decided here.

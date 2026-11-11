@@ -71,15 +71,16 @@ fn assert_library(document: &Document) -> Result<(), String> {
     {
         return Err(format!("unexpected key {key:?}"));
     }
-    if component.role != DependencyRole::Direct {
-        return Err(format!("role {:?}", component.role));
-    }
-    let attributes = component
+    let stored = component
         .versions
         .iter()
         .find(|(version, _)| version.version == "1.2.0" && version.epoch.is_none())
-        .map(|(_, attributes)| attributes)
+        .map(|(_, stored)| stored)
         .ok_or("missing version 1.2.0")?;
+    if stored.role != DependencyRole::Direct {
+        return Err(format!("role {:?}", stored.role));
+    }
+    let attributes = &stored.attributes;
     for license in ["MIT", "Custom", "MIT OR Apache-2.0"] {
         if !attributes.licenses.contains(license) {
             return Err(format!("missing license {license}"));
@@ -99,8 +100,14 @@ fn assert_library(document: &Document) -> Result<(), String> {
         return Err(format!("attributes {attributes:?}"));
     }
     let (_, root) = find(document, "app")?;
-    if root.role != DependencyRole::Root {
-        return Err(format!("root role {:?}", root.role));
+    let root_role = root
+        .versions
+        .values()
+        .next()
+        .map(|stored| stored.role)
+        .ok_or("missing root version")?;
+    if root_role != DependencyRole::Root {
+        return Err(format!("root role {root_role:?}"));
     }
     Ok(())
 }
@@ -163,11 +170,12 @@ fn lockward_shaped_npm_document_is_read() -> Result<(), String> {
     if ty != "npm" || namespace.as_deref() != Some("@scope") || name != "left-pad" {
         return Err(format!("scoped key {scoped:?}"));
     }
-    let attributes = component
+    let attributes = &component
         .versions
         .values()
         .next()
-        .ok_or("missing scoped version")?;
+        .ok_or("missing scoped version")?
+        .attributes;
     if !attributes.hashes.contains(&ContentHash {
         alg: "SHA-256".to_owned(),
         content: "abcd".to_owned(),
@@ -179,13 +187,13 @@ fn lockward_shaped_npm_document_is_read() -> Result<(), String> {
         .versions
         .values()
         .next()
-        .map(|attributes| attributes.scopes.clone())
+        .map(|stored| stored.attributes.scopes.clone())
         .ok_or("missing scoped version scopes")?;
     let other_scopes = other
         .versions
         .values()
         .next()
-        .map(|attributes| attributes.scopes.clone())
+        .map(|stored| stored.attributes.scopes.clone())
         .ok_or("missing other scopes")?;
     if scoped_scopes.len() != 1 || other_scopes.len() != 1 || scoped_scopes == other_scopes {
         return Err(format!("scopes {scoped_scopes:?} and {other_scopes:?}"));
@@ -194,10 +202,12 @@ fn lockward_shaped_npm_document_is_read() -> Result<(), String> {
         .warnings
         .iter()
         .any(|warning| warning.kind == WarningKind::RoleUnknown)
-        && document
-            .components
-            .values()
-            .all(|component| component.role == DependencyRole::Unknown)
+        && document.components.values().all(|component| {
+            component
+                .versions
+                .values()
+                .all(|stored| stored.role == DependencyRole::Unknown)
+        })
     {
         return Ok(());
     }
@@ -209,6 +219,34 @@ fn nested_components_are_both_stored() -> Result<(), String> {
     let document = read_fixture("nested-components.json")?;
     find(&document, "parent")?;
     find(&document, "child")?;
+    Ok(())
+}
+
+#[test]
+fn two_versions_of_one_package_take_different_roles() -> Result<(), String> {
+    let document = read_default(
+        br#"{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"bom-ref":"app","name":"app","version":"1","purl":"pkg:generic/app@1"}},"components":[{"bom-ref":"direct","name":"left","version":"1.0.0","purl":"pkg:npm/left@1.0.0"},{"bom-ref":"later","name":"left","version":"2.0.0","purl":"pkg:npm/left@2.0.0"}],"dependencies":[{"ref":"app","dependsOn":["direct"]},{"ref":"direct","dependsOn":["later"]}]}"#,
+    )
+    .map_err(|error| error.to_string())?;
+    let (_, left) = find(&document, "left")?;
+    let direct = left
+        .versions
+        .iter()
+        .find(|(version, _)| version.version == "1.0.0")
+        .map(|(_, stored)| stored.role)
+        .ok_or("missing 1.0.0")?;
+    let transitive = left
+        .versions
+        .iter()
+        .find(|(version, _)| version.version == "2.0.0")
+        .map(|(_, stored)| stored.role)
+        .ok_or("missing 2.0.0")?;
+    if direct != DependencyRole::Direct || transitive != DependencyRole::Transitive {
+        return Err(format!("roles {direct:?} {transitive:?}"));
+    }
+    if document.components.len() != 2 {
+        return Err(format!("{} keys", document.components.len()));
+    }
     Ok(())
 }
 
@@ -239,8 +277,20 @@ fn a_cycle_is_data() -> Result<(), String> {
     let document = read_fixture("cycle.json")?;
     let (_, first) = find(&document, "a")?;
     let (_, second) = find(&document, "b")?;
-    if first.role != DependencyRole::Direct || second.role != DependencyRole::Transitive {
-        return Err(format!("roles {:?} {:?}", first.role, second.role));
+    let first_role = first
+        .versions
+        .values()
+        .next()
+        .map(|stored| stored.role)
+        .ok_or("missing a")?;
+    let second_role = second
+        .versions
+        .values()
+        .next()
+        .map(|stored| stored.role)
+        .ok_or("missing b")?;
+    if first_role != DependencyRole::Direct || second_role != DependencyRole::Transitive {
+        return Err(format!("roles {first_role:?} {second_role:?}"));
     }
     if document.dependencies.len() != 3 {
         return Err(format!("{} edge sources", document.dependencies.len()));
@@ -253,8 +303,20 @@ fn a_dependency_chain_longer_than_32_is_accepted() -> Result<(), String> {
     let document = read_default(chain(40).as_bytes()).map_err(|error| error.to_string())?;
     let (_, last) = find(&document, "n39")?;
     let (_, first) = find(&document, "n0")?;
-    if first.role != DependencyRole::Direct || last.role != DependencyRole::Transitive {
-        return Err(format!("roles {:?} {:?}", first.role, last.role));
+    let first_role = first
+        .versions
+        .values()
+        .next()
+        .map(|stored| stored.role)
+        .ok_or("missing n0")?;
+    let last_role = last
+        .versions
+        .values()
+        .next()
+        .map(|stored| stored.role)
+        .ok_or("missing n39")?;
+    if first_role != DependencyRole::Direct || last_role != DependencyRole::Transitive {
+        return Err(format!("roles {first_role:?} {last_role:?}"));
     }
     if document.components.len() != 41 {
         return Err(format!("{} components", document.components.len()));
@@ -690,11 +752,12 @@ fn conflicting_attributes_are_united_and_warned() -> Result<(), String> {
     )
     .map_err(|error| error.to_string())?;
     let component = document.components.values().next().ok_or("missing")?;
-    let attributes = component
+    let attributes = &component
         .versions
         .values()
         .next()
-        .ok_or("missing version")?;
+        .ok_or("missing version")?
+        .attributes;
     if !attributes.licenses.contains("MIT") || !attributes.licenses.contains("Apache-2.0") {
         return Err(format!("{:?}", attributes.licenses));
     }
