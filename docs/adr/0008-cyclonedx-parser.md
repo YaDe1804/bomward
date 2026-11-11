@@ -82,10 +82,21 @@ past 127 is rejected by the scan and never becomes a
 ### Duplicate object keys
 
 `serde_json` keeps the last value of a duplicated key. The JSON RFC
-leaves this to the parser. bomward uses that behavior, tests it, and
-does not reject the document. Generators do emit duplicate keys, and
-rejecting them would fail a review for a reason the policy did not ask
-about.
+leaves this to the parser. bomward uses that behavior and does not
+reject the document. Generators do emit duplicate keys, and rejecting
+them would fail a review for a reason the policy did not ask about.
+
+The same depth scan records the duplicate. It is not a second parse.
+Each open object keeps the keys it has already seen, and drops that set
+when the object ends. The bytes were already capped by
+`--max-file-bytes`, and the scan stops at depth 127, so the sets cannot
+grow past the input that was accepted. One warning is enough: kind
+`duplicate-key`, with no component key and with no copy of the repeated
+name. A key written as `\uXXXX` is decoded before the comparison, so it
+matches the key `serde_json` keeps. The same key in a nested object is
+not a duplicate. If the scan loses track of the grammar it stops
+recording keys and still counts depth; a document that then fails to
+parse reports the JSON error, not the warning.
 
 ## Rationale
 

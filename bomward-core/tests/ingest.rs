@@ -599,7 +599,7 @@ fn dangling_refs_warn() -> Result<(), String> {
 #[test]
 fn duplicate_json_keys_keep_the_last_value() -> Result<(), String> {
     let document = read_default(
-        br#"{"bomFormat":"CycloneDX","specVersion":"1.6","components":[{"name":"first","name":"second","version":"1"}]}"#,
+        br#"{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"name":"app","version":"1"}},"components":[{"name":"first","name":"second","version":"1"}],"dependencies":[]}"#,
     )
     .map_err(|error| error.to_string())?;
     find(&document, "second")?;
@@ -608,6 +608,23 @@ fn duplicate_json_keys_keep_the_last_value() -> Result<(), String> {
         name: "first".to_owned(),
     }) {
         return Err("first name survived".to_owned());
+    }
+    if document.warnings.len() != 1 {
+        return Err(format!("{:?}", document.warnings));
+    }
+    let warning = document.warnings.first().ok_or("missing warning")?;
+    if warning.kind != WarningKind::DuplicateKey
+        || warning.kind.id() != "duplicate-key"
+        || warning.key.is_some()
+    {
+        return Err(format!("{warning:?}"));
+    }
+    let nested = read_default(
+        br#"{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"name":"app","version":"1"}},"components":[{"name":"a","version":"1","components":[{"name":"b","version":"1"}]}],"dependencies":[]}"#,
+    )
+    .map_err(|error| error.to_string())?;
+    if !nested.warnings.is_empty() {
+        return Err(format!("{:?}", nested.warnings));
     }
     Ok(())
 }

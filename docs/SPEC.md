@@ -41,7 +41,8 @@ License, hash, and supplier changes apply to a version that is in both
 sets. An invalid `purl` does not reject the file. The key falls back to
 `group` plus `name`, and the report counts and lists a warning. When a
 component `version` and its purl version differ, the purl version is
-stored and the document warns `version-mismatch`.
+stored and the document warns `version-mismatch`. A JSON object that
+repeats a key keeps the last value and warns `duplicate-key`.
 
 Each change records whether the component is direct, transitive, the root,
 or unknown in the document that contains it. That classification uses the

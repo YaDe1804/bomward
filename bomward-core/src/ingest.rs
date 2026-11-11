@@ -8,7 +8,8 @@
 //!
 //! `bomFormat` and `specVersion` are checked before any component is built.
 //! Unknown JSON fields are ignored. Duplicate object keys keep the last
-//! value, which is what `serde_json` does (ADR 0008).
+//! value, which is what `serde_json` does, and the document warns
+//! `duplicate-key` (ADR 0008).
 
 use std::collections::{BTreeMap, BTreeSet, btree_map::Entry};
 use std::fmt::Write;
@@ -130,16 +131,19 @@ pub fn read_bytes(bytes: &[u8], limits: &Limits) -> Result<Document, Error> {
     }
     let bytes = bytes.strip_prefix(UTF8_BOM).unwrap_or(bytes);
     let text = std::str::from_utf8(bytes).map_err(|_| DocumentError::Utf8)?;
-    if let Some(found_depth) = json_depth_past(text, Limits::json_depth_limit()) {
-        return Err(limit(
-            LimitKind::JsonNesting,
-            found_depth,
-            u64::from(Limits::json_depth_limit()),
-        ));
-    }
+    let duplicate_key = match scan_json(text, Limits::json_depth_limit()) {
+        Ok(duplicate_key) => duplicate_key,
+        Err(found_depth) => {
+            return Err(limit(
+                LimitKind::JsonNesting,
+                found_depth,
+                u64::from(Limits::json_depth_limit()),
+            ));
+        }
+    };
     let value = parse_json(text)?;
     check_header(&value)?;
-    assemble(&value, limits)
+    assemble(&value, limits, duplicate_key)
 }
 
 fn limit(kind: LimitKind, found: u64, limit: u64) -> Error {
@@ -148,38 +152,361 @@ fn limit(kind: LimitKind, found: u64, limit: u64) -> Error {
 
 /// Container depth, counting `{` and `[` outside strings. The outermost value
 /// is depth 1. Returns the depth that first exceeded `limit`.
-fn json_depth_past(text: &str, limit: u32) -> Option<u64> {
-    let mut depth = 0_u32;
-    let mut in_string = false;
-    let mut escaped = false;
-    for character in text.chars() {
-        if in_string {
-            if escaped {
-                escaped = false;
+/// One pass over the text. `Ok` carries whether any object repeated a key.
+/// `Err` is the container depth that crossed `limit`.
+///
+/// Key sets live only for objects that are still open, so the extra memory
+/// stays within the file-size cap and the depth cap. A scan that loses the
+/// grammar stops recording keys and keeps counting depth.
+fn scan_json(text: &str, limit: u32) -> Result<bool, u64> {
+    let mut scan = Scan {
+        chars: text.chars().peekable(),
+        depth: 0,
+        limit,
+        duplicate: false,
+        tracking: true,
+        frames: Vec::new(),
+        text: Text::Code,
+        key_buf: String::new(),
+    };
+    scan.run()?;
+    Ok(scan.duplicate)
+}
+
+struct Scan<'a> {
+    chars: std::iter::Peekable<std::str::Chars<'a>>,
+    depth: u32,
+    limit: u32,
+    duplicate: bool,
+    tracking: bool,
+    frames: Vec<Container>,
+    text: Text,
+    key_buf: String,
+}
+
+struct Container {
+    object: bool,
+    phase: Phase,
+    keys: BTreeSet<String>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Phase {
+    KeyOrEnd,
+    Colon,
+    ValueOrEnd,
+    CommaOrEnd,
+}
+
+enum Text {
+    Code,
+    Atom,
+    String { capturing: bool, decode_ok: bool },
+}
+
+impl Scan<'_> {
+    fn run(&mut self) -> Result<(), u64> {
+        while let Some(character) = self.chars.next() {
+            if self.in_string() {
+                self.string_char(character);
                 continue;
             }
-            match character {
-                '\\' => escaped = true,
-                '"' => in_string = false,
-                _ => {}
-            }
-            continue;
-        }
-        match character {
-            '"' => in_string = true,
-            '{' | '[' => {
-                depth = depth.saturating_add(1);
-                if depth > limit {
-                    return Some(u64::from(depth));
+            if self.in_atom() {
+                if atom_char(character) {
+                    continue;
                 }
+                self.finish_atom();
             }
-            '}' | ']' => {
-                depth = depth.saturating_sub(1);
+            self.code_char(character)?;
+        }
+        Ok(())
+    }
+
+    fn in_string(&self) -> bool {
+        matches!(self.text, Text::String { .. })
+    }
+
+    fn in_atom(&self) -> bool {
+        matches!(self.text, Text::Atom)
+    }
+
+    fn code_char(&mut self, character: char) -> Result<(), u64> {
+        match character {
+            ' ' | '\n' | '\r' | '\t' => {}
+            '{' => self.open(true)?,
+            '[' => self.open(false)?,
+            '}' => self.close(true),
+            ']' => self.close(false),
+            '"' => self.start_string(),
+            ':' => self.colon(),
+            ',' => self.comma(),
+            other if self.tracking && atom_char(other) && self.value_expected() => {
+                self.text = Text::Atom;
             }
-            _ => {}
+            _ => self.lose(),
+        }
+        Ok(())
+    }
+
+    fn open(&mut self, object: bool) -> Result<(), u64> {
+        self.depth = self.depth.saturating_add(1);
+        if self.depth > self.limit {
+            return Err(u64::from(self.depth));
+        }
+        if self.tracking && self.value_expected() {
+            self.frames.push(Container {
+                object,
+                phase: if object {
+                    Phase::KeyOrEnd
+                } else {
+                    Phase::ValueOrEnd
+                },
+                keys: BTreeSet::new(),
+            });
+        } else {
+            self.lose();
+        }
+        Ok(())
+    }
+
+    fn close(&mut self, object: bool) {
+        self.depth = self.depth.saturating_sub(1);
+        if !self.tracking {
+            return;
+        }
+        let Some(frame) = self.frames.pop() else {
+            self.lose();
+            return;
+        };
+        let empty = (object && frame.phase == Phase::KeyOrEnd)
+            || (!object && frame.phase == Phase::ValueOrEnd);
+        if frame.object != object || !(empty || frame.phase == Phase::CommaOrEnd) {
+            self.lose();
+            return;
+        }
+        if let Some(parent) = self.frames.last_mut() {
+            if parent.phase == Phase::ValueOrEnd {
+                parent.phase = Phase::CommaOrEnd;
+            } else {
+                self.lose();
+            }
         }
     }
-    None
+
+    fn start_string(&mut self) {
+        let capturing = self.tracking
+            && self
+                .frames
+                .last()
+                .is_some_and(|frame| frame.object && frame.phase == Phase::KeyOrEnd);
+        if self.tracking && !capturing && !self.value_expected() {
+            self.lose();
+        }
+        self.key_buf.clear();
+        self.text = Text::String {
+            capturing: capturing && self.tracking,
+            decode_ok: true,
+        };
+    }
+
+    fn colon(&mut self) {
+        if !self.tracking {
+            return;
+        }
+        if let Some(frame) = self.frames.last_mut()
+            && frame.phase == Phase::Colon
+        {
+            frame.phase = Phase::ValueOrEnd;
+        } else {
+            self.lose();
+        }
+    }
+
+    fn comma(&mut self) {
+        if !self.tracking {
+            return;
+        }
+        let Some(frame) = self.frames.last_mut() else {
+            self.lose();
+            return;
+        };
+        if frame.phase != Phase::CommaOrEnd {
+            self.lose();
+            return;
+        }
+        frame.phase = if frame.object {
+            Phase::KeyOrEnd
+        } else {
+            Phase::ValueOrEnd
+        };
+    }
+
+    fn finish_atom(&mut self) {
+        self.text = Text::Code;
+        if !self.tracking {
+            return;
+        }
+        if let Some(frame) = self.frames.last_mut()
+            && frame.phase == Phase::ValueOrEnd
+        {
+            frame.phase = Phase::CommaOrEnd;
+        } else if !self.frames.is_empty() {
+            self.lose();
+        }
+    }
+
+    fn value_expected(&self) -> bool {
+        match self.frames.last() {
+            None => true,
+            Some(frame) => frame.phase == Phase::ValueOrEnd,
+        }
+    }
+
+    fn lose(&mut self) {
+        self.tracking = false;
+        self.frames.clear();
+    }
+
+    fn string_char(&mut self, character: char) {
+        let Text::String {
+            capturing,
+            decode_ok,
+        } = self.text
+        else {
+            return;
+        };
+        if character == '\\' {
+            let Some(escaped) = self.chars.next() else {
+                return;
+            };
+            if capturing && decode_ok {
+                let still_ok = push_escape(escaped, &mut self.chars, &mut self.key_buf);
+                self.text = Text::String {
+                    capturing,
+                    decode_ok: still_ok,
+                };
+            }
+            return;
+        }
+        if character == '"' {
+            self.finish_string(capturing, decode_ok);
+            return;
+        }
+        if capturing && decode_ok {
+            self.key_buf.push(character);
+        }
+    }
+
+    fn finish_string(&mut self, capturing: bool, decode_ok: bool) {
+        self.text = Text::Code;
+        if !self.tracking {
+            return;
+        }
+        if capturing {
+            if !decode_ok {
+                self.lose();
+                return;
+            }
+            let key = std::mem::take(&mut self.key_buf);
+            if let Some(frame) = self.frames.last_mut()
+                && !frame.keys.insert(key)
+            {
+                self.duplicate = true;
+            }
+            if let Some(frame) = self.frames.last_mut() {
+                frame.phase = Phase::Colon;
+            }
+            return;
+        }
+        if let Some(frame) = self.frames.last_mut() {
+            if frame.phase == Phase::ValueOrEnd {
+                frame.phase = Phase::CommaOrEnd;
+            } else {
+                self.lose();
+            }
+        }
+    }
+}
+
+fn atom_char(character: char) -> bool {
+    character.is_ascii_alphanumeric() || matches!(character, '+' | '-' | '.')
+}
+
+fn push_escape(
+    escaped: char,
+    chars: &mut std::iter::Peekable<std::str::Chars<'_>>,
+    buf: &mut String,
+) -> bool {
+    match escaped {
+        '"' | '\\' | '/' => buf.push(escaped),
+        'b' => buf.push('\u{0008}'),
+        'f' => buf.push('\u{000c}'),
+        'n' => buf.push('\n'),
+        'r' => buf.push('\r'),
+        't' => buf.push('\t'),
+        'u' => return push_unicode(chars, buf),
+        _ => return false,
+    }
+    true
+}
+
+fn push_unicode(chars: &mut std::iter::Peekable<std::str::Chars<'_>>, buf: &mut String) -> bool {
+    let Some(unit) = take_hex4(chars) else {
+        return false;
+    };
+    let code = if (0xD800..=0xDBFF).contains(&unit) {
+        if !peek_unicode_escape(chars) {
+            return false;
+        }
+        let Some(low) = take_hex4(chars) else {
+            return false;
+        };
+        if !(0xDC00..=0xDFFF).contains(&low) {
+            return false;
+        }
+        0x1_0000 + (((unit - 0xD800) << 10) | (low - 0xDC00))
+    } else if (0xDC00..=0xDFFF).contains(&unit) {
+        return false;
+    } else {
+        unit
+    };
+    match char::from_u32(code) {
+        Some(character) => {
+            buf.push(character);
+            true
+        }
+        None => false,
+    }
+}
+
+fn peek_unicode_escape(chars: &mut std::iter::Peekable<std::str::Chars<'_>>) -> bool {
+    let mut look = chars.clone();
+    if look.next() == Some('\\') && look.next() == Some('u') {
+        chars.next();
+        chars.next();
+        true
+    } else {
+        false
+    }
+}
+
+fn take_hex4(chars: &mut std::iter::Peekable<std::str::Chars<'_>>) -> Option<u32> {
+    let mut value = 0_u32;
+    for _ in 0..4 {
+        let digit = chars.peek().copied().and_then(hex_digit)?;
+        chars.next();
+        value = value * 16 + digit;
+    }
+    Some(value)
+}
+
+fn hex_digit(character: char) -> Option<u32> {
+    match character {
+        '0'..='9' => Some(u32::from(character) - u32::from('0')),
+        'a'..='f' => Some(u32::from(character) - u32::from('a') + 10),
+        'A'..='F' => Some(u32::from(character) - u32::from('A') + 10),
+        _ => None,
+    }
 }
 
 fn parse_json(text: &str) -> Result<Value, Error> {
@@ -271,7 +598,7 @@ struct Assembler<'a> {
     dependencies: BTreeMap<ComponentKey, BTreeSet<ComponentKey>>,
 }
 
-fn assemble(value: &Value, limits: &Limits) -> Result<Document, Error> {
+fn assemble(value: &Value, limits: &Limits, duplicate_key: bool) -> Result<Document, Error> {
     let Some(object) = value.as_object() else {
         return Err(DocumentError::Shape.into());
     };
@@ -287,6 +614,12 @@ fn assemble(value: &Value, limits: &Limits) -> Result<Document, Error> {
     assembler.read_inventory(object)?;
     let dependencies_present = assembler.read_dependencies(object)?;
     assembler.classify(dependencies_present);
+    if duplicate_key {
+        assembler.warnings.insert(Warning {
+            key: None,
+            kind: WarningKind::DuplicateKey,
+        });
+    }
     Ok(Document {
         components: assembler.components,
         dependencies: assembler.dependencies,
@@ -647,12 +980,34 @@ fn collect_hashes(target: &mut BTreeSet<ContentHash>, value: &Value) {
 
 #[cfg(test)]
 mod tests {
-    use super::json_depth_past;
+    use super::scan_json;
 
     #[test]
     fn braces_inside_strings_do_not_add_depth() {
         let text = r#"{"name":"a{b[c]d}","ok":true}"#;
-        assert!(json_depth_past(text, 1).is_none());
-        assert_eq!(json_depth_past(text, 0), Some(1));
+        assert!(scan_json(text, 1).is_ok());
+        assert_eq!(scan_json(text, 0), Err(1));
+    }
+
+    #[test]
+    fn duplicate_keys_are_flagged_without_confusing_nested_objects() -> Result<(), String> {
+        let cases = [
+            (r#"{"a":1,"a":2}"#, true),
+            (r#"{"a":{"a":1}}"#, false),
+            (r#"{"a":"a"}"#, false),
+            (r#"{"a":1,"\u0061":2}"#, true),
+            (r#"{"/":1,"\/":2}"#, true),
+            (r#"[{"a":1},{"a":2}]"#, false),
+            (r#"{ "a" : 1 , "b" : 2 }"#, false),
+            (r#"{"a":"a{a}"}"#, false),
+        ];
+        for (text, duplicate) in cases {
+            match scan_json(text, 127) {
+                Ok(found) if found == duplicate => {}
+                Ok(found) => return Err(format!("{text} -> {found}")),
+                Err(depth) => return Err(format!("{text} depth {depth}")),
+            }
+        }
+        Ok(())
     }
 }

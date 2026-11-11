@@ -273,6 +273,11 @@ pub enum WarningKind {
     ///
     /// The stored version is the purl version.
     VersionMismatch,
+    /// A JSON object repeated a key. Id: `duplicate-key`.
+    ///
+    /// The last value is the one that was read. The warning is not attached
+    /// to a component, and it does not repeat the key.
+    DuplicateKey,
 }
 
 impl WarningKind {
@@ -286,6 +291,7 @@ impl WarningKind {
             Self::RoleUnknown => "role-unknown",
             Self::ConflictingAttributes => "conflicting-attributes",
             Self::VersionMismatch => "version-mismatch",
+            Self::DuplicateKey => "duplicate-key",
         }
     }
 
@@ -299,6 +305,7 @@ impl WarningKind {
             Self::RoleUnknown => "component role is unknown",
             Self::ConflictingAttributes => "same version carried different attributes",
             Self::VersionMismatch => "component version differs from purl version",
+            Self::DuplicateKey => "json object contains a duplicate key",
         }
     }
 }

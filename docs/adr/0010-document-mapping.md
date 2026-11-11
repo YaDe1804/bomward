@@ -120,6 +120,7 @@ one warning.
 | `role-unknown` | No root component, or no `dependencies` field. The role is `unknown`. |
 | `conflicting-attributes` | The same key and version carried different attributes. |
 | `version-mismatch` | The component `version` and the purl version differ. The purl version is stored. |
+| `duplicate-key` | A JSON object repeated a key. The last value is kept. The warning has no component key. |
 
 Warnings do not change the error returned for a valid document. They do
 not change the exit code (ADR 0005).

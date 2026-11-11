@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exits 2 with `not implemented yet`. It does not review SBOMs yet.
 - A component `version` that differs from its purl version warns
   `version-mismatch`. The stored version is the purl version.
+- A repeated key in a JSON object warns `duplicate-key`. The last value
+  is the one that is read.
 - `bomward-core` reads CycloneDX JSON 1.4–1.7 into the normalized model
   (`read_path`, `read_bytes`), including limits, purl identity, and warnings.
 - ADRs 0008 (owned CycloneDX model), 0009 (`packageurl` 0.7.1), and 0010
