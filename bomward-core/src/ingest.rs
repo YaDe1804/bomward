@@ -38,7 +38,8 @@ const UTF8_BOM: &[u8] = &[0xEF, 0xBB, 0xBF];
 ///
 /// # Errors
 ///
-/// Returns [`Error::Io`] when the path cannot be read, and the same errors as
+/// Returns [`Error::Io`] when the path cannot be read, [`Error::UnsupportedDepth`]
+/// when `--max-depth` is above the supported maximum, and the same errors as
 /// [`read_bytes`] for the contents.
 ///
 /// # Examples
@@ -56,6 +57,7 @@ const UTF8_BOM: &[u8] = &[0xEF, 0xBB, 0xBF];
 /// ```
 #[must_use = "ignoring the result drops a rejected document"]
 pub fn read_path(path: &Path, limits: &Limits) -> Result<Document, Error> {
+    limits.check_depth()?;
     let metadata = std::fs::metadata(path).map_err(|source| Error::Io {
         path: path.to_path_buf(),
         source,
@@ -94,8 +96,12 @@ pub fn read_path(path: &Path, limits: &Limits) -> Result<Document, Error> {
 ///
 /// # Errors
 ///
-/// * [`Error::LimitExceeded`] when the byte length, the component count, the
-///   component nesting, or the JSON container depth is over the limit.
+/// * [`Error::UnsupportedDepth`] when `--max-depth` is above
+///   [`Limits::MAX_SUPPORTED_DEPTH`]. No bytes are parsed.
+/// * [`Error::LimitExceeded`] when the byte length, the component count, or
+///   the component nesting is over the limit, or when JSON containers are
+///   nested past [`Limits::json_depth_limit`]. The JSON sentence does not
+///   name `--max-depth`.
 /// * [`Error::UnsupportedSpecVersion`] when `specVersion` is missing or not
 ///   1.4, 1.5, 1.6, or 1.7.
 /// * [`Error::InvalidDocument`] when the bytes are not a `CycloneDX` JSON
@@ -117,17 +123,18 @@ pub fn read_path(path: &Path, limits: &Limits) -> Result<Document, Error> {
 /// ```
 #[must_use = "ignoring the result drops a rejected document"]
 pub fn read_bytes(bytes: &[u8], limits: &Limits) -> Result<Document, Error> {
+    limits.check_depth()?;
     let found = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
     if found > limits.max_file_bytes {
         return Err(limit(LimitKind::FileBytes, found, limits.max_file_bytes));
     }
     let bytes = bytes.strip_prefix(UTF8_BOM).unwrap_or(bytes);
     let text = std::str::from_utf8(bytes).map_err(|_| DocumentError::Utf8)?;
-    if let Some(found_depth) = json_depth_past(text, limits.json_depth_limit()) {
+    if let Some(found_depth) = json_depth_past(text, Limits::json_depth_limit()) {
         return Err(limit(
-            LimitKind::NestingDepth,
+            LimitKind::JsonNesting,
             found_depth,
-            u64::from(limits.json_depth_limit()),
+            u64::from(Limits::json_depth_limit()),
         ));
     }
     let value = parse_json(text)?;

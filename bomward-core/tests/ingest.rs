@@ -295,7 +295,7 @@ fn chain(length: u32) -> String {
 fn file_size_boundary_is_exact() -> Result<(), String> {
     let mut bytes = fixture("minimal-1.6.json")?;
     let limit = u64::try_from(bytes.len()).map_err(|error| error.to_string())?;
-    let limits = Limits::new(limit, 100, 32);
+    let limits = Limits::new(limit, 100, 32).map_err(|error| error.to_string())?;
     read_bytes(&bytes, &limits).map_err(|error| error.to_string())?;
     bytes.push(b' ');
     let error = require_err(read_bytes(&bytes, &limits))?;
@@ -312,12 +312,12 @@ fn path_read_uses_metadata_and_the_byte_cap() -> Result<(), String> {
     let limit = u64::try_from(bytes.len()).map_err(|error| error.to_string())?;
     let path = std::env::temp_dir().join(format!("bomward-size-{}.json", std::process::id()));
     std::fs::write(&path, &bytes).map_err(|error| error.to_string())?;
-    let accepted =
-        read_path(&path, &Limits::new(limit, 100, 32)).map_err(|error| error.to_string());
+    let limits = Limits::new(limit, 100, 32).map_err(|error| error.to_string())?;
+    let accepted = read_path(&path, &limits).map_err(|error| error.to_string());
     let mut over = bytes.clone();
     over.push(b' ');
     std::fs::write(&path, &over).map_err(|error| error.to_string())?;
-    let rejected = read_path(&path, &Limits::new(limit, 100, 32));
+    let rejected = read_path(&path, &limits);
     let removed = std::fs::remove_file(&path);
     accepted?;
     removed.map_err(|error| error.to_string())?;
@@ -331,7 +331,8 @@ fn path_read_uses_metadata_and_the_byte_cap() -> Result<(), String> {
 
 #[test]
 fn component_count_boundary_is_exact() -> Result<(), String> {
-    let limits = Limits::new(Limits::DEFAULT_MAX_FILE_BYTES, 2, 32);
+    let limits =
+        Limits::new(Limits::DEFAULT_MAX_FILE_BYTES, 2, 32).map_err(|error| error.to_string())?;
     read_bytes(count_document(2).as_bytes(), &limits).map_err(|error| error.to_string())?;
     let error = require_err(read_bytes(count_document(3).as_bytes(), &limits))?;
     if error.to_string() != "component count 3 exceeds limit 2 (--max-components)" {
@@ -382,15 +383,54 @@ fn nested(depth: u32) -> String {
 
 #[test]
 fn json_nesting_boundary_is_exact() -> Result<(), String> {
-    let limit = Limits::defaults().json_depth_limit();
+    let limit = Limits::json_depth_limit();
     let accepted = padded(limit);
     read_default(accepted.as_bytes()).map_err(|error| error.to_string())?;
     let error = require_err(read_default(padded(limit + 1).as_bytes()))?;
     let found = u64::from(limit) + 1;
-    if error.to_string() != format!("nesting depth {found} exceeds limit {limit} (--max-depth)") {
+    let text = error.to_string();
+    if text != format!("json nesting {found} exceeds limit {limit}") || text.contains("--max-depth")
+    {
+        return Err(text);
+    }
+    match error {
+        Error::LimitExceeded(exceeded) if exceeded.kind == LimitKind::JsonNesting => Ok(()),
+        other => Err(other.to_string()),
+    }
+}
+
+#[test]
+fn max_depth_above_the_json_cap_is_a_usage_error() -> Result<(), String> {
+    let expected = "--max-depth 64 exceeds supported maximum 63";
+    match Limits::new(1, 1, 64) {
+        Ok(_) => return Err("depth 64 was accepted".to_owned()),
+        Err(error) if error.to_string() == expected => {}
+        Err(error) => return Err(error.to_string()),
+    }
+    let limits = Limits::new(
+        Limits::DEFAULT_MAX_FILE_BYTES,
+        1_000,
+        Limits::MAX_SUPPORTED_DEPTH,
+    )
+    .map_err(|error| error.to_string())?;
+    read_bytes(nested(Limits::MAX_SUPPORTED_DEPTH).as_bytes(), &limits)
+        .map_err(|error| error.to_string())?;
+    let bypassed = Limits {
+        max_file_bytes: 1_024,
+        max_components: 10,
+        max_depth: 64,
+    };
+    let error = require_err(read_bytes(
+        br#"{"bomFormat":"CycloneDX","specVersion":"1.6","components":[]}"#,
+        &bypassed,
+    ))?;
+    if error.to_string() != expected {
         return Err(error.to_string());
     }
-    Ok(())
+    match error {
+        Error::UnsupportedDepth(depth) if depth.requested == 64 && depth.maximum == 63 => Ok(()),
+        other => Err(other.to_string()),
+    }
 }
 
 fn padded(depth: u32) -> String {

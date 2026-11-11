@@ -4,11 +4,15 @@
 //!
 //! The numbers are the v0.1 defaults. A caller, later the CLI, may raise one
 //! of them for a single run. Changing a default is an amendment of that ADR.
+//! `--max-depth` limits components inside components. JSON container depth
+//! is the fixed parser cap and does not follow the flag.
 
-/// How large a document may be, and how deep it may nest.
+use crate::error::UnsupportedDepth;
+
+/// How large a document may be, and how deep its components may nest.
 ///
-/// JSON container depth uses [`Limits::json_depth_limit`], not
-/// [`Limits::max_depth`] by itself. ADR 0008 defines that ceiling.
+/// JSON container depth uses [`Limits::json_depth_limit`], which does not
+/// move with [`Limits::max_depth`]. ADR 0008 defines that cap.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
     /// Maximum size of one document, in bytes. Default: 33,554,432.
@@ -18,7 +22,9 @@ pub struct Limits {
     pub max_components: u64,
     /// Maximum nesting of `components` inside `components`. Default: 32.
     ///
-    /// This does not limit the length of a dependency chain.
+    /// This does not limit the length of a dependency chain, and it does
+    /// not limit JSON container depth. Values above
+    /// [`Self::MAX_SUPPORTED_DEPTH`] are rejected.
     pub max_depth: u32,
 }
 
@@ -38,6 +44,14 @@ impl Limits {
     /// so 127 succeeds. ADR 0008 caps the JSON measurement here.
     pub const SERDE_JSON_MAX_DEPTH: u32 = 127;
 
+    /// Largest `--max-depth` whose component tree still fits in
+    /// [`Self::SERDE_JSON_MAX_DEPTH`].
+    ///
+    /// A component at depth `D` sits at JSON container depth `2 * D + 1`:
+    /// the root object, then one array and one object per level.
+    /// `2 * 63 + 1 = 127`.
+    pub const MAX_SUPPORTED_DEPTH: u32 = (Self::SERDE_JSON_MAX_DEPTH - 1) / 2;
+
     /// The defaults from ADR 0006.
     #[must_use]
     pub const fn defaults() -> Self {
@@ -48,32 +62,89 @@ impl Limits {
         }
     }
 
-    /// Limits for one run. There is no further clamping.
-    #[must_use]
-    pub const fn new(max_file_bytes: u64, max_components: u64, max_depth: u32) -> Self {
-        Self {
+    /// Limits for one run.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`UnsupportedDepth`] when `max_depth` is above
+    /// [`Self::MAX_SUPPORTED_DEPTH`].
+    pub const fn new(
+        max_file_bytes: u64,
+        max_components: u64,
+        max_depth: u32,
+    ) -> Result<Self, UnsupportedDepth> {
+        let limits = Self {
             max_file_bytes,
             max_components,
             max_depth,
+        };
+        match limits.check_depth() {
+            Ok(()) => Ok(limits),
+            Err(error) => Err(error),
         }
     }
 
-    /// Maximum JSON array and object nesting for this flag.
+    /// Rejects a depth the JSON parser cannot hold.
     ///
-    /// The formula is `min(4 * max_depth + 8, 127)`. See ADR 0008.
-    #[must_use]
-    pub const fn json_depth_limit(self) -> u32 {
-        let scaled = self.max_depth.saturating_mul(4).saturating_add(8);
-        if scaled < Self::SERDE_JSON_MAX_DEPTH {
-            scaled
+    /// A struct literal can bypass [`Self::new`]. Every read calls this
+    /// so that path still fails before the bytes are parsed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`UnsupportedDepth`] when `max_depth` is above
+    /// [`Self::MAX_SUPPORTED_DEPTH`].
+    pub const fn check_depth(self) -> Result<(), UnsupportedDepth> {
+        if self.max_depth > Self::MAX_SUPPORTED_DEPTH {
+            Err(UnsupportedDepth {
+                requested: self.max_depth,
+                maximum: Self::MAX_SUPPORTED_DEPTH,
+            })
         } else {
-            Self::SERDE_JSON_MAX_DEPTH
+            Ok(())
         }
+    }
+
+    /// JSON container depth the depth scan rejects.
+    ///
+    /// This is the parser cap. It does not move with `--max-depth`.
+    #[must_use]
+    pub const fn json_depth_limit() -> u32 {
+        Self::SERDE_JSON_MAX_DEPTH
     }
 }
 
 impl Default for Limits {
     fn default() -> Self {
         Self::defaults()
+    }
+}
+
+const _: () = assert!(Limits::DEFAULT_MAX_DEPTH <= Limits::MAX_SUPPORTED_DEPTH);
+const _: () = assert!(2 * Limits::MAX_SUPPORTED_DEPTH + 1 == Limits::SERDE_JSON_MAX_DEPTH);
+
+#[cfg(test)]
+mod tests {
+    use super::Limits;
+
+    #[test]
+    fn the_supported_depth_is_the_largest_chain_the_json_cap_holds() -> Result<(), String> {
+        let depth = Limits::MAX_SUPPORTED_DEPTH;
+        if 2 * depth + 1 != Limits::SERDE_JSON_MAX_DEPTH {
+            return Err(format!("depth {depth} does not fill the json cap"));
+        }
+        if Limits::new(1, 1, depth).is_err() {
+            return Err("the supported depth was rejected".to_owned());
+        }
+        match Limits::new(1, 1, depth + 1) {
+            Ok(_) => Err("one past the supported depth was accepted".to_owned()),
+            Err(error) => {
+                let text = error.to_string();
+                if text == "--max-depth 64 exceeds supported maximum 63" {
+                    Ok(())
+                } else {
+                    Err(text)
+                }
+            }
+        }
     }
 }

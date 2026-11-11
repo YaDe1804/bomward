@@ -32,14 +32,16 @@ That is a denial-of-service against the CI job, or a panic that a caller
 might misread as a pass.
 
 Mitigation: the defaults reject a file larger than 32 MiB, a document
-with more than 100,000 components, or nesting deeper than 32. Nesting
-means `components` inside `components`, and JSON arrays and objects
-while parsing. It does not mean the length of a dependency chain. Each
-default has a flag (`--max-file-bytes`, `--max-components`,
+with more than 100,000 components, or component nesting deeper than 32.
+That nesting means `components` inside `components`. It does not mean
+the length of a dependency chain, and it does not mean JSON container
+depth. Each default has a flag (`--max-file-bytes`, `--max-components`,
 `--max-depth`). A violation names the limit, the value found, and that
-flag, and exits 2. JSON container depth is also capped, at
-`min(4 * max_depth + 8, 127)`, so a nested bomb is refused before
-`serde_json` builds it (ADR 0008). A dependency cycle is stored as data.
+flag, and exits 2. `--max-depth` above 63 is a usage error: that is the
+deepest component tree the JSON cap still holds. JSON container depth
+is capped at 127, independent of the flag, so a nested bomb is refused
+before `serde_json` builds it (ADR 0008). That error does not name
+`--max-depth`. A dependency cycle is stored as data.
 Every graph walk keeps a visited set, so a cycle cannot spin. Library
 code does not panic.
 `unsafe` is forbidden, so a parse bug cannot become a memory-safety bug

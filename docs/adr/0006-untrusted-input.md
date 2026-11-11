@@ -24,12 +24,23 @@ bomward is static.
   | --- | --- | --- |
   | one input file | 32 MiB (33,554,432 bytes) | `--max-file-bytes` |
   | component objects, including nested ones | 100,000 | `--max-components` |
-  | nesting of `components` inside `components`, and JSON nesting while parsing | 32 | `--max-depth` |
+  | nesting of `components` inside `components` | 32 (maximum 63) | `--max-depth` |
+  | JSON arrays and objects while parsing | 127 | none; this is the parser cap |
 
 - `--max-depth` does **not** limit the path length of the dependency
-  graph. A path is bounded by the component count, because every walk
-  carries a visited set and stops when it meets a component it has
-  already seen.
+  graph, and it does **not** limit JSON container depth. A path is
+  bounded by the component count, because every walk carries a visited
+  set and stops when it meets a component it has already seen.
+- The largest `--max-depth` the JSON cap still carries is 63. A
+  component at depth `D` sits at container depth `2 * D + 1` (the root
+  object, then one array and one object per level), and
+  `2 * 63 + 1 = 127`. A larger value is a usage error. The limits
+  constructor returns it, and a read returns the same error when a
+  struct literal bypasses the constructor. No file is parsed.
+
+  ```text
+  --max-depth {requested} exceeds supported maximum {maximum}
+  ```
 - A cycle in the dependency graph is data. It is stored with the edges
   that declared it. It is not an input error and it has no flag.
 - A limit violation is an error (exit 2). The message names the limit,
@@ -39,7 +50,12 @@ bomward is static.
   file size {found} exceeds limit {limit} (--max-file-bytes)
   component count {found} exceeds limit {limit} (--max-components)
   nesting depth {found} exceeds limit {limit} (--max-depth)
+  json nesting {found} exceeds limit {limit}
   ```
+
+  The JSON sentence does not name `--max-depth`. `{limit}` there is 127.
+  Lowering the flag does not tighten that cap, and raising the flag
+  cannot raise it.
 
 - Over-limit input does not panic and does not truncate. A document that
   only contains a cycle is accepted, up to the component-count limit.
@@ -96,13 +112,13 @@ the tool inside the files the operator named.
 
 - Ingest enforces the limits before and during the parse, so a huge
   file is refused without holding the whole payload past the cap.
-- `--max-depth` counts two things: how deep `components` is nested
-  inside `components`, and how deep JSON arrays and objects are nested
-  while parsing. It does not count edges in `dependencies`. Component
-  nesting is compared with the flag value. JSON container nesting is
-  compared with the ceiling in [ADR 0008](0008-cyclonedx-parser.md),
-  which is wide enough for a component tree of that depth. Both
-  failures use the nesting-depth sentence above.
+- `--max-depth` counts how deep `components` is nested inside
+  `components`. It does not count edges in `dependencies`, and it does
+  not count JSON arrays and objects. Component nesting is compared with
+  the flag value and uses the nesting-depth sentence. JSON container
+  nesting is compared with 127, the ceiling in
+  [ADR 0008](0008-cyclonedx-parser.md), and uses the JSON sentence.
+  A flag above 63 is the usage error above, not a document error.
 - Graph walks in this crate and in later diff code use a visited set.
   They do not reject the document because a cycle exists.
 - The report module owns escaping. Callers pass untrusted strings
@@ -113,5 +129,5 @@ the tool inside the files the operator named.
 - The numbers above are the defaults. A real SBOM that exceeds one of
   them is passed with that run's flag. Changing the default for every
   run is an amendment of this ADR.
-- The violation text is part of the contract. AP1 uses the three
-  sentences above and does not invent a second shape.
+- The violation text is part of the contract. The four sentences above
+  are the ones a rejected document or a rejected flag produces.

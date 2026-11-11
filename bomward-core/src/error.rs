@@ -5,7 +5,7 @@
 //! [`Error::NotImplemented`] remains only for modules that are not written
 //! yet (`diff`, `policy`, `report`). Ingest failures use the other variants.
 //! Display text for a rejected `specVersion` is the sentence from ADR 0004.
-//! Display text for a limit is one of the three sentences from ADR 0006.
+//! Display text for a limit is one of the sentences from ADR 0006.
 //!
 //! Messages do not copy SBOM strings. The one exception is `specVersion`:
 //! control characters are written as `\u{XXXX}` and the value is cut at 64
@@ -60,6 +60,12 @@ pub enum Error {
     /// The document is not truncated. Callers match on [`LimitExceeded::kind`].
     #[error(transparent)]
     LimitExceeded(#[from] LimitExceeded),
+
+    /// `--max-depth` is above the depth the JSON parser can hold.
+    ///
+    /// This is a usage error. No file is parsed.
+    #[error(transparent)]
+    UnsupportedDepth(#[from] UnsupportedDepth),
 }
 
 /// Why a document was rejected before it became a model.
@@ -103,15 +109,30 @@ pub enum LimitKind {
     FileBytes,
     /// `--max-components`.
     ComponentCount,
-    /// `--max-depth`, either component nesting or JSON container depth.
+    /// `--max-depth`: nesting of components inside components.
     NestingDepth,
+    /// JSON arrays and objects nested past the parser cap.
+    ///
+    /// This is not `--max-depth`. The sentence does not name that flag.
+    JsonNesting,
+}
+
+/// `--max-depth` is above [`crate::Limits::MAX_SUPPORTED_DEPTH`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
+#[error("--max-depth {requested} exceeds supported maximum {maximum}")]
+pub struct UnsupportedDepth {
+    /// The value passed as `--max-depth`.
+    pub requested: u32,
+    /// The largest value this build can parse.
+    pub maximum: u32,
 }
 
 /// A limit from ADR 0006 was exceeded.
 ///
 /// `found` and `limit` are the numbers in the sentence. For component
-/// nesting, `limit` is the flag. For JSON container depth, `limit` is the
-/// ceiling from ADR 0008.
+/// nesting, `limit` is the flag. For JSON container depth, `limit` is
+/// [`crate::Limits::SERDE_JSON_MAX_DEPTH`] and the sentence does not name
+/// `--max-depth`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
 #[error("{}", limit_message(*kind, *found, *limit))]
 pub struct LimitExceeded {
@@ -134,12 +155,13 @@ fn limit_message(kind: LimitKind, found: u64, limit: u64) -> String {
         LimitKind::NestingDepth => {
             format!("nesting depth {found} exceeds limit {limit} (--max-depth)")
         }
+        LimitKind::JsonNesting => format!("json nesting {found} exceeds limit {limit}"),
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Error, LimitExceeded, LimitKind};
+    use super::{Error, LimitExceeded, LimitKind, UnsupportedDepth};
 
     #[test]
     fn not_implemented_display_is_stable() {
@@ -175,6 +197,26 @@ mod tests {
         assert_eq!(
             depth.to_string(),
             "nesting depth 33 exceeds limit 32 (--max-depth)"
+        );
+        let json = LimitExceeded {
+            kind: LimitKind::JsonNesting,
+            found: 128,
+            limit: 127,
+        };
+        let json_text = json.to_string();
+        assert_eq!(json_text, "json nesting 128 exceeds limit 127");
+        assert!(!json_text.contains("--max-depth"));
+    }
+
+    #[test]
+    fn an_unsupported_depth_names_the_flag_and_the_maximum() {
+        let error = Error::from(UnsupportedDepth {
+            requested: 64,
+            maximum: 63,
+        });
+        assert_eq!(
+            error.to_string(),
+            "--max-depth 64 exceeds supported maximum 63"
         );
     }
 }

@@ -21,7 +21,7 @@ pub mod report;
 
 mod purl;
 
-pub use error::{DocumentError, Error, LimitExceeded, LimitKind};
+pub use error::{DocumentError, Error, LimitExceeded, LimitKind, UnsupportedDepth};
 pub use ingest::{read_bytes, read_path};
 pub use limits::Limits;
 pub use model::{

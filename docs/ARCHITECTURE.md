@@ -46,9 +46,10 @@ files. `ingest` is the only module that interprets CycloneDX JSON.
 functions do not panic and do not exit the process.
 
 `NotImplemented` remains for diff, policy, and report. Ingest adds I/O,
-invalid document, unsupported `specVersion`, and limit variants. The
-limit variant carries the kind (file size, component count, or nesting
-depth), the value that was found, and the limit. Display text matches
+invalid document, unsupported `specVersion`, limit variants, and a
+usage error when `--max-depth` is above 63. The limit variant carries
+the kind (file size, component count, component nesting, or JSON
+nesting), the value that was found, and the limit. Display text matches
 ADR 0004 and ADR 0006. The crate is `publish = false` and pre-release,
 so the enum is not a stability promise.
 

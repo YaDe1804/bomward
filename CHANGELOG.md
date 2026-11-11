@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The graph position is a role (`root`, `direct`, `transitive`,
   `unknown`). A missing graph warns `role-unknown`. `scope` is only the
   CycloneDX field. The policy sketch uses `role:`.
-- A dependency cycle is stored. `--max-depth` limits nested `components`
-  and JSON container depth, not the length of a dependency chain.
+- A dependency cycle is stored. `--max-depth` limits nested `components`,
+  not JSON container depth and not the length of a dependency chain.
+  JSON containers are capped at 127, and that error does not name the
+  flag. `--max-depth` above 63 is a usage error.
 - GitHub Actions runs push builds on `main` only. Pull requests are unchanged.
