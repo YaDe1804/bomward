@@ -49,7 +49,9 @@ or unknown in the document that contains it. The graph node is one key
 together with one version. Two versions of one package can have two roles.
 [ADR 0010](adr/0010-document-mapping.md) defines the four roles. A document
 with no `metadata.component`, or with no `dependencies` field, marks every
-version unknown and counts one warning, `role-unknown`. `scope` in a
+version unknown and counts one warning, `role-unknown`. When the graph
+is present, a version that stays unknown also counts one warning,
+`unreachable`, once per component key. `scope` in a
 component is only the CycloneDX field. `bom-ref` is never compared
 across the two documents.
 

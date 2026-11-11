@@ -103,7 +103,9 @@ package are two nodes.
 When `metadata.component` is absent, or the `dependencies` field is
 absent, every version's role is `unknown` and the document gets one
 warning, kind `role-unknown`. An empty `dependencies` array is present:
-the root's role is `root`, and nothing is direct. How AP2 prints these
+the root's role is `root`, and every other version stays `unknown` and
+gets `unreachable`. A missing `dependencies` field does not also warn
+`unreachable`; that case is only `role-unknown`. How AP2 prints these
 roles is not decided here.
 
 `scope` is only the CycloneDX field (`required`, `optional`,
@@ -125,6 +127,7 @@ one warning.
 | `conflicting-attributes` | The same key and version carried different attributes. |
 | `version-mismatch` | The component `version` and the purl version differ. The purl version is stored. |
 | `duplicate-key` | A JSON object repeated a key. The last value is kept. The warning has no component key. |
+| `unreachable` | A `dependencies` field and a root are present, and a version stayed `unknown`. Text: `component is not reachable from the root`. One warning per key. |
 
 Warnings do not change the error returned for a valid document. They do
 not change the exit code (ADR 0005).

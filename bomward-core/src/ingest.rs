@@ -689,6 +689,26 @@ impl Assembler {
                 }
             }
         }
+        warn_unreachable(self);
+    }
+}
+
+fn warn_unreachable(assembler: &mut Assembler) {
+    let mut keys = BTreeSet::new();
+    for (key, component) in &assembler.components {
+        if component
+            .versions
+            .values()
+            .any(|stored| stored.role == DependencyRole::Unknown)
+        {
+            keys.insert(key.clone());
+        }
+    }
+    for key in keys {
+        assembler.warnings.insert(Warning {
+            key: Some(key),
+            kind: WarningKind::Unreachable,
+        });
     }
 }
 

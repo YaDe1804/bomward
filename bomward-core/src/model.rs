@@ -298,6 +298,11 @@ pub enum WarningKind {
     /// The last value is the one that was read. The warning is not attached
     /// to a component, and it does not repeat the key.
     DuplicateKey,
+    /// A version stayed unknown although the document has a root and a
+    /// `dependencies` field. Id: `unreachable`.
+    ///
+    /// Several unreachable versions of one key produce one warning.
+    Unreachable,
 }
 
 impl WarningKind {
@@ -312,6 +317,7 @@ impl WarningKind {
             Self::ConflictingAttributes => "conflicting-attributes",
             Self::VersionMismatch => "version-mismatch",
             Self::DuplicateKey => "duplicate-key",
+            Self::Unreachable => "unreachable",
         }
     }
 
@@ -326,6 +332,7 @@ impl WarningKind {
             Self::ConflictingAttributes => "same version carried different attributes",
             Self::VersionMismatch => "component version differs from purl version",
             Self::DuplicateKey => "json object contains a duplicate key",
+            Self::Unreachable => "component is not reachable from the root",
         }
     }
 }

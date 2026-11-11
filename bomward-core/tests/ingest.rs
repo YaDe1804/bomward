@@ -251,6 +251,57 @@ fn two_versions_of_one_package_take_different_roles() -> Result<(), String> {
 }
 
 #[test]
+fn an_unlinked_version_warns_unreachable_once_per_key() -> Result<(), String> {
+    let document = read_default(
+        br#"{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"bom-ref":"app","name":"app","version":"1","purl":"pkg:generic/app@1"}},"components":[{"name":"left","version":"1.0.0","purl":"pkg:npm/left@1.0.0"},{"name":"left","version":"2.0.0","purl":"pkg:npm/left@2.0.0"}],"dependencies":[]}"#,
+    )
+    .map_err(|error| error.to_string())?;
+    let (_, left) = find(&document, "left")?;
+    if !left
+        .versions
+        .values()
+        .all(|stored| stored.role == DependencyRole::Unknown)
+    {
+        return Err("linked version was not unknown".to_owned());
+    }
+    let unreachable = document
+        .warnings
+        .iter()
+        .filter(|warning| warning.kind == WarningKind::Unreachable)
+        .count();
+    if unreachable != 1 || warning_key(&document, WarningKind::Unreachable) != Some("left") {
+        return Err(format!("{:?}", document.warnings));
+    }
+    if document
+        .warnings
+        .iter()
+        .any(|warning| warning.kind == WarningKind::RoleUnknown)
+    {
+        return Err("missing graph warned role-unknown".to_owned());
+    }
+    let absent = read_default(
+        br#"{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"name":"app","version":"1"}},"components":[{"name":"left","version":"1"}]}"#,
+    )
+    .map_err(|error| error.to_string())?;
+    if absent
+        .warnings
+        .iter()
+        .any(|warning| warning.kind == WarningKind::Unreachable)
+    {
+        return Err(format!("{:?}", absent.warnings));
+    }
+    Ok(())
+}
+
+fn warning_key(document: &Document, kind: WarningKind) -> Option<&str> {
+    document
+        .warnings
+        .iter()
+        .find(|warning| warning.kind == kind)
+        .and_then(|warning| warning.key.as_ref().map(key_name))
+}
+
+#[test]
 fn two_versions_are_one_key() -> Result<(), String> {
     let document = read_fixture("two-versions.json")?;
     if document.components.len() != 1 {
@@ -649,11 +700,11 @@ fn assert_document(error: &Error, kind: DocumentErrorKind) -> Result<(), String>
 #[test]
 fn invalid_purl_falls_back_and_a_missing_purl_does_not_warn() -> Result<(), String> {
     let invalid = read_default(
-        br#"{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"name":"app","version":"1","purl":"pkg:generic/app@1"}},"components":[{"group":"g","name":"n","purl":"not a purl"}],"dependencies":[]}"#,
+        br#"{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"bom-ref":"app","name":"app","version":"1","purl":"pkg:generic/app@1"}},"components":[{"bom-ref":"n","group":"g","name":"n","purl":"not a purl"}],"dependencies":[{"ref":"app","dependsOn":["n"]}]}"#,
     )
     .map_err(|error| error.to_string())?;
     let missing = read_default(
-        br#"{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"name":"app","version":"1","purl":"pkg:generic/app@1"}},"components":[{"group":"g","name":"n"}],"dependencies":[]}"#,
+        br#"{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"bom-ref":"app","name":"app","version":"1","purl":"pkg:generic/app@1"}},"components":[{"bom-ref":"n","group":"g","name":"n"}],"dependencies":[{"ref":"app","dependsOn":["n"]}]}"#,
     )
     .map_err(|error| error.to_string())?;
     let expected = ComponentKey::Name {
@@ -695,7 +746,7 @@ fn a_fallback_without_a_name_is_rejected() -> Result<(), String> {
 #[test]
 fn dangling_refs_warn() -> Result<(), String> {
     let document = read_default(
-        br#"{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"bom-ref":"app","name":"app","version":"1","purl":"pkg:generic/app@1"}},"components":[{"bom-ref":"a","name":"a","version":"1","purl":"pkg:generic/a@1"}],"dependencies":[{"ref":"missing"},{"ref":"app","dependsOn":["gone"]}]}"#,
+        br#"{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"bom-ref":"app","name":"app","version":"1","purl":"pkg:generic/app@1"}},"components":[{"bom-ref":"a","name":"a","version":"1","purl":"pkg:generic/a@1"}],"dependencies":[{"ref":"missing"},{"ref":"app","dependsOn":["gone","a"]}]}"#,
     )
     .map_err(|error| error.to_string())?;
     let orphans = document
@@ -715,7 +766,7 @@ fn dangling_refs_warn() -> Result<(), String> {
 #[test]
 fn duplicate_json_keys_keep_the_last_value() -> Result<(), String> {
     let document = read_default(
-        br#"{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"name":"app","version":"1"}},"components":[{"name":"first","name":"second","version":"1"}],"dependencies":[]}"#,
+        br#"{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"bom-ref":"app","name":"app","version":"1"}},"components":[{"bom-ref":"second","name":"first","name":"second","version":"1"}],"dependencies":[{"ref":"app","dependsOn":["second"]}]}"#,
     )
     .map_err(|error| error.to_string())?;
     find(&document, "second")?;
@@ -736,7 +787,7 @@ fn duplicate_json_keys_keep_the_last_value() -> Result<(), String> {
         return Err(format!("{warning:?}"));
     }
     let nested = read_default(
-        br#"{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"name":"app","version":"1"}},"components":[{"name":"a","version":"1","components":[{"name":"b","version":"1"}]}],"dependencies":[]}"#,
+        br#"{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"bom-ref":"app","name":"app","version":"1"}},"components":[{"bom-ref":"a","name":"a","version":"1","components":[{"bom-ref":"b","name":"b","version":"1"}]}],"dependencies":[{"ref":"app","dependsOn":["a","b"]}]}"#,
     )
     .map_err(|error| error.to_string())?;
     if !nested.warnings.is_empty() {
@@ -748,7 +799,7 @@ fn duplicate_json_keys_keep_the_last_value() -> Result<(), String> {
 #[test]
 fn conflicting_attributes_are_united_and_warned() -> Result<(), String> {
     let document = read_default(
-        br#"{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"name":"app","version":"1","purl":"pkg:generic/app@1"}},"components":[{"name":"a","version":"1","purl":"pkg:generic/a@1","licenses":[{"license":{"id":"MIT"}}]},{"name":"a","version":"1","purl":"pkg:generic/a@1","licenses":[{"license":{"id":"Apache-2.0"}}]}],"dependencies":[]}"#,
+        br#"{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"bom-ref":"app","name":"app","version":"1","purl":"pkg:generic/app@1"}},"components":[{"bom-ref":"a","name":"a","version":"1","purl":"pkg:generic/a@1","licenses":[{"license":{"id":"MIT"}}]},{"name":"a","version":"1","purl":"pkg:generic/a@1","licenses":[{"license":{"id":"Apache-2.0"}}]}],"dependencies":[{"ref":"app","dependsOn":["a"]}]}"#,
     )
     .map_err(|error| error.to_string())?;
     let component = document.components.values().next().ok_or("missing")?;
@@ -773,7 +824,7 @@ fn conflicting_attributes_are_united_and_warned() -> Result<(), String> {
 #[test]
 fn a_component_version_that_differs_from_the_purl_warns() -> Result<(), String> {
     let mismatched = read_default(
-        br#"{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"name":"app","version":"1","purl":"pkg:generic/app@1"}},"components":[{"name":"left-pad","version":"9.9.9","purl":"pkg:npm/left-pad@1.2.0"}],"dependencies":[]}"#,
+        br#"{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"bom-ref":"app","name":"app","version":"1","purl":"pkg:generic/app@1"}},"components":[{"bom-ref":"left","name":"left-pad","version":"9.9.9","purl":"pkg:npm/left-pad@1.2.0"}],"dependencies":[{"ref":"app","dependsOn":["left"]}]}"#,
     )
     .map_err(|error| error.to_string())?;
     let (_, component) = find(&mismatched, "left-pad")?;
@@ -797,7 +848,7 @@ fn a_component_version_that_differs_from_the_purl_warns() -> Result<(), String> 
         return Err(format!("{warning:?}"));
     }
     let matched = read_default(
-        br#"{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"name":"app","version":"1","purl":"pkg:generic/app@1"}},"components":[{"name":"left-pad","version":"1.2.0","purl":"pkg:npm/left-pad@1.2.0"}],"dependencies":[]}"#,
+        br#"{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"bom-ref":"app","name":"app","version":"1","purl":"pkg:generic/app@1"}},"components":[{"bom-ref":"left","name":"left-pad","version":"1.2.0","purl":"pkg:npm/left-pad@1.2.0"}],"dependencies":[{"ref":"app","dependsOn":["left"]}]}"#,
     )
     .map_err(|error| error.to_string())?;
     if !matched.warnings.is_empty() {
