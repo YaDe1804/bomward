@@ -1,0 +1,18 @@
+---
+description: Commits, quality gate, ADRs, and the _intern folder
+alwaysApply: true
+---
+
+# Workflow
+
+- Conventional Commits: `feat(ingest): …`, `docs(adr): …`, `chore(ci): …`.
+- Run the quality gate before every commit, and continue only when it is green:
+  `cargo fmt --all --check`
+  `cargo clippy --all-targets --all-features --locked -- -D warnings`
+  `cargo nextest run --locked`
+  `cargo deny check`
+  `cargo audit`
+- Record every non-trivial design decision as `docs/adr/NNNN-title.md`.
+- No destructive git commands. Do not push. Deniz pushes.
+- `_intern/` is read-only and gitignored. Do not edit it, and do not commit anything from it.
+- When the specification is genuinely ambiguous, ask. Do not invent a second product decision.

@@ -1,0 +1,22 @@
+---
+description: Rust quality bar for every bomward change
+alwaysApply: true
+---
+
+# Quality
+
+- Rust, stable toolchain, edition 2024. Enterprise-grade, clean code, current APIs.
+- Add crates with `cargo add`. Read that version's docs. Do not pin versions from memory.
+- `#![forbid(unsafe_code)]` in every crate. `unsafe_code` is also forbidden in the workspace lints.
+- No panics on the library path: no `unwrap`, `expect`, `panic!`, or unchecked indexing. The workspace denies those Clippy lints.
+- `thiserror` for typed errors in `bomward-core`. `anyhow` only in `bomward-cli`.
+- Public API is fully rustdoc'd. `missing_docs` is a workspace lint.
+- Tests are required: unit tests per module, golden files for parsers and reports.
+
+```rust
+// Bad: panics on an empty list.
+let name = components[0].name.clone().unwrap();
+
+// Good: the library returns a typed error.
+let name = components.first().ok_or(Error::NotImplemented)?;
+```

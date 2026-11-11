@@ -1,0 +1,16 @@
+[package]
+name = "bomward-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish.workspace = true
+description = "Library for the bomward SBOM review gate."
+
+[dependencies]
+thiserror = "2.0.21"
+
+[lints]
+workspace = true

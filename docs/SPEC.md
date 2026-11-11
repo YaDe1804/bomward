@@ -1,0 +1,173 @@
+# bomward specification
+
+Status of this document: contract for v0.1. The implementation is not usable yet.
+The foundation CLI parses `diff` and exits with code 2. See [ARCHITECTURE.md](ARCHITECTURE.md).
+
+## Purpose
+
+bomward is an SBOM review gate for pull requests and releases. It compares two
+CycloneDX SBOMs (old to new), explains the change in plain language, judges
+that change against a policy, and returns an exit code for CI.
+
+The review question is: may this change pass, and why?
+
+## What v0.1 does
+
+Given two CycloneDX JSON documents and an optional policy file, v0.1 will:
+
+1. Read only the paths the user passed.
+2. Normalize each document into the model from [ADR 0005](adr/0005-component-identity.md).
+3. Diff the two models.
+4. If `--policy` is present, judge the diff against the policy. If it is
+   omitted, stay in report-only mode.
+5. Write one report and exit with the code from [ADR 0007](adr/0007-exit-codes-and-determinism.md).
+
+Data flow: `ingest` → `model` → `diff` → `policy` → `report`.
+
+Each component key maps to a set of versions, defined in
+[ADR 0005](adr/0005-component-identity.md). The diff compares those sets.
+
+Diff kinds in v0.1:
+
+- component added
+- component removed
+- version added or removed inside a component's version set
+- license changed
+- hash changed
+- supplier changed
+
+License, hash, and supplier changes apply to a version that is in both
+sets. An invalid `purl` does not reject the file. The key falls back to
+`group` plus `name`, and the report counts and lists a warning.
+
+Each change records whether the component is direct or transitive in the
+document that contains it. That classification uses the dependency graph
+inside a single document. `bom-ref` is never compared across the two
+documents. How a component that is absent from the graph is classified is
+decided with the diff implementation (AP2), not in this foundation.
+
+## Non-goals for v0.1
+
+- A general-purpose SBOM diff. See the boundary below.
+- SPDX, CycloneDX XML, and CycloneDX Protobuf.
+- CycloneDX JSON `specVersion` 1.2 and 1.3.
+- Looking up vulnerabilities, fetching packages, or executing package code.
+- Any network access.
+- Generating SBOMs.
+- A GitHub Action or a release pipeline. Those are later work packages.
+
+## Boundary
+
+`sbomdiff` (Python, [anthonyharrison/sbomdiff](https://github.com/anthonyharrison/sbomdiff))
+reports added and removed packages and changes of version, license, and
+checksum for SPDX and CycloneDX.
+
+`sbom-tools` (Rust, [sbom-tool/sbom-tools](https://github.com/sbom-tool/sbom-tools))
+normalizes CycloneDX and SPDX and diffs components, dependencies, licenses,
+and vulnerabilities.
+
+bomward does not replace either tool. It consumes two CycloneDX JSON SBOMs
+and produces a policy verdict a CI job can block on.
+
+## CLI contract
+
+```text
+bomward --version
+bomward --help
+bomward diff <OLD> <NEW> [--policy <FILE>] [--format <terminal|markdown|json>] [--max-file-bytes N] [--max-components N] [--max-depth N]
+```
+
+| Argument | Meaning |
+| --- | --- |
+| `OLD` | Baseline CycloneDX JSON file. Required. |
+| `NEW` | Candidate CycloneDX JSON file. Required. |
+| `--policy <FILE>` | Policy file. Optional. Omit it for report-only mode. |
+| `--format` | `terminal` (default), `markdown`, or `json`. |
+| `--max-file-bytes` | Max size of one input file. Default `33554432`. |
+| `--max-components` | Max component objects, including nested ones. Default `100000`. |
+| `--max-depth` | Max nesting depth. Default `32`. |
+
+`--version` and `--help` exit 0.
+
+Until the pipeline exists, `diff` prints `not implemented yet` and exits 2.
+It does not read the files. A missing argument is a usage error and also
+exits 2.
+
+When the pipeline exists:
+
+- If `--policy` is omitted, the run is report-only and exits 0. Terminal,
+  Markdown, and JSON include the sentence `No policy was applied.` JSON
+  also sets `"policy_applied": false`. The report still lists the changes.
+- If `--policy` is present, that sentence is absent and a denial exits 1.
+- `--format terminal` writes plain text. It does not emit ANSI color.
+- `markdown` is the text a pull-request comment can host.
+- `json` is the machine-readable report.
+
+Human-facing CLI text is English.
+
+## Exit codes
+
+| Code | Meaning |
+| --- | --- |
+| 0 | The inputs are valid, and either no policy was applied or the policy allows the change. |
+| 1 | The inputs are valid and the policy denies the change. |
+| 2 | Usage error, rejected input, or a command that is not implemented yet. |
+
+No other code is used. Details are in [ADR 0007](adr/0007-exit-codes-and-determinism.md).
+
+## Input format
+
+v0.1 accepts CycloneDX JSON only, `specVersion` 1.4, 1.5, 1.6, and 1.7.
+The current CycloneDX specification is 1.7 (released 2025-10-21, ECMA-424).
+The decision and the sources are in [ADR 0004](adr/0004-cyclonedx-json.md).
+
+Anything else — XML, SPDX, a missing `bomFormat`, an unsupported
+`specVersion` — is an input error (exit 2). An unsupported or missing
+`specVersion` reports:
+
+```text
+unsupported specVersion {found}; supported versions: 1.4, 1.5, 1.6, 1.7
+```
+
+`{found}` is `missing` when the field is absent.
+
+Limits for hostile files are defaults from [ADR 0006](adr/0006-untrusted-input.md):
+32 MiB per file (`--max-file-bytes`), 100,000 components
+(`--max-components`), and nesting depth 32 (`--max-depth`). A violation
+names the limit, the value that was found, and the flag.
+
+## Policy sketch
+
+AP3 freezes the schema. v0.1 aims at a YAML file of this shape:
+
+```yaml
+default: allow # allow | deny
+rules:
+  - id: no-new-direct-dependencies
+    description: New direct dependencies need a review.
+    when:
+      change: added # added | removed | version-changed | license-changed | hash-changed | supplier-changed
+      scope: direct # direct | transitive | any
+    decision: deny # allow | deny
+```
+
+Evaluation rules for that future schema:
+
+- `deny` outranks `allow`.
+- Every matching `deny` is included in the verdict, sorted by `id`.
+- If no rule matches, `default` applies.
+- An omitted `--policy` does not evaluate rules. The run is report-only.
+
+This sketch is not parsed in the foundation.
+
+## Determinism
+
+The same SBOM bytes, policy bytes, format flag, and limit flags produce
+byte-identical stdout. Reports use LF. They contain no timestamps and no
+local paths. Warnings are sorted.
+The rule is [ADR 0007](adr/0007-exit-codes-and-determinism.md).
+
+## Deferred
+
+AP0 does not choose the CycloneDX parser. AP1 records that choice in an ADR
+before ingest is implemented.
