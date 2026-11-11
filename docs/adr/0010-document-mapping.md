@@ -49,16 +49,18 @@ Each value is a sorted set. Order in the file does not matter.
 | Attribute | Source | Set element |
 | --- | --- | --- |
 | licenses | `licenses[]` | `license.id`, `license.name`, and `expression`, each as its own string |
-| hashes | `hashes[]` | the pair `(alg, content)` when both are strings |
+| hashes | `hashes[]` | the pair `(alg, content)` when both are strings. `content` is stored as lowercase ASCII. `alg` is not. |
 | supplier | `supplier.name` | the name string |
 | scope | `scope` | the scope string (`required`, `optional`, `excluded`, or whatever the file says) |
 | type | `type` | the type string |
 | purl leftovers | qualifiers removed from the key | `checksum`, `download_url`, `vcs_url`, `file_name`, `vers` |
 
 A field that is absent, or that has a JSON type this table does not
-name, contributes nothing. It is not an error. Names, license strings,
-and hash strings are stored as they appear, including control characters
-and Markdown. They are not truncated.
+name, contributes nothing. It is not an error. Names and license strings
+are stored as they appear, including control characters and Markdown.
+They are not truncated. Hash content is stored as lowercase ASCII so
+`ABCD` and `abcd` are one hash and do not later look like a hash change.
+The algorithm name is stored as it appears.
 
 ### The same key and version with different attributes
 

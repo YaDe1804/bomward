@@ -38,7 +38,8 @@ Diff kinds in v0.1:
 - supplier changed
 
 License, hash, and supplier changes apply to a version that is in both
-sets. An invalid `purl` does not reject the file. The key falls back to
+sets. Hash content is stored as lowercase hex, so letter case is not a
+hash change. The algorithm name keeps its case. An invalid `purl` does not reject the file. The key falls back to
 `group` plus `name`, and the report counts and lists a warning. When a
 component `version` and its purl version differ, the purl version is
 stored and the document warns `version-mismatch`. A JSON object that

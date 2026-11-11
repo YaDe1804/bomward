@@ -1413,7 +1413,10 @@ impl<'de> Visitor<'de> for HashItemVisitor {
             }
         }
         Ok(match (alg, content) {
-            (Some(alg), Some(content)) => Some(ContentHash { alg, content }),
+            (Some(alg), Some(content)) => Some(ContentHash {
+                alg,
+                content: content.to_ascii_lowercase(),
+            }),
             _ => None,
         })
     }

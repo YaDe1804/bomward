@@ -822,6 +822,36 @@ fn conflicting_attributes_are_united_and_warned() -> Result<(), String> {
 }
 
 #[test]
+fn hash_content_is_stored_as_lowercase_hex() -> Result<(), String> {
+    let document = read_default(
+        br#"{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"bom-ref":"app","name":"app","version":"1","purl":"pkg:generic/app@1"}},"components":[{"bom-ref":"a","name":"a","version":"1","purl":"pkg:generic/a@1","hashes":[{"alg":"SHA-256","content":"ABCD"}]},{"name":"a","version":"1","purl":"pkg:generic/a@1","hashes":[{"alg":"SHA-256","content":"abcd"}]}],"dependencies":[{"ref":"app","dependsOn":["a"]}]}"#,
+    )
+    .map_err(|error| error.to_string())?;
+    let (_, component) = find(&document, "a")?;
+    let attributes = &component
+        .versions
+        .values()
+        .next()
+        .ok_or("missing version")?
+        .attributes;
+    if attributes.hashes.len() != 1 {
+        return Err(format!("{:?}", attributes.hashes));
+    }
+    let hash = attributes.hashes.iter().next().ok_or("missing hash")?;
+    if hash.alg != "SHA-256" || hash.content != "abcd" {
+        return Err(format!("{hash:?}"));
+    }
+    if document
+        .warnings
+        .iter()
+        .any(|warning| warning.kind == WarningKind::ConflictingAttributes)
+    {
+        return Err(format!("{:?}", document.warnings));
+    }
+    Ok(())
+}
+
+#[test]
 fn a_component_version_that_differs_from_the_purl_warns() -> Result<(), String> {
     let mismatched = read_default(
         br#"{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"bom-ref":"app","name":"app","version":"1","purl":"pkg:generic/app@1"}},"components":[{"bom-ref":"left","name":"left-pad","version":"9.9.9","purl":"pkg:npm/left-pad@1.2.0"}],"dependencies":[{"ref":"app","dependsOn":["left"]}]}"#,
