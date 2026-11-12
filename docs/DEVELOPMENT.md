@@ -16,7 +16,14 @@ Data flow: `ingest` → `model` → `diff` → `policy` → `report`.
 
 ## Toolchain
 
-- Rust stable, edition 2024, with `rustfmt` and `clippy` (`rust-toolchain.toml`).
+- Edition 2024. `rust-toolchain.toml` pins an exact stable release, currently
+  **1.100.0**, with `rustfmt` and `clippy`. It does not say `stable`.
+- Local commands and the fmt, clippy, test, deny, and audit jobs follow that
+  file. A new Rust release does not change them until the pin moves.
+- Dependabot (`package-ecosystem: rust-toolchain` in
+  `.github/dependabot.yml`) opens a pull request for a newer versioned
+  channel. Merging that pull request is the bump. It does not change the
+  MSRV.
 - `cargo-nextest`, `cargo-deny`, and `cargo-audit` on the PATH for the gate.
 
 ## MSRV
@@ -27,15 +34,14 @@ It is **1.99**, the stable release this foundation was built with
 
 - Code and dependencies build and pass tests on that version. Do not use
   newer language features or newer standard-library APIs.
-- `rust-toolchain.toml` stays on `stable`. The fmt, clippy, test, deny,
-  and audit jobs follow that channel.
 - The `msrv` job reads `rust-version` from `Cargo.toml` and installs that
-  toolchain. It runs `cargo build --locked --all-targets` and
-  `cargo nextest run --locked`. It does not keep a second copy of the
-  number.
-- Raising the MSRV is a deliberate change in the same commit as this
-  section: a dependency's floor, or an edition feature the project
-  chooses to require. Do not raise it because stable moved.
+  toolchain. It does not use the pin in `rust-toolchain.toml`. It runs
+  `cargo build --locked --all-targets` and `cargo nextest run --locked`.
+  It does not keep a second copy of the number.
+- Raising the MSRV is a deliberate change of `rust-version` in the same
+  commit as this section: a dependency's floor, or an edition feature the
+  project chooses to require. Moving the pinned toolchain is not an MSRV
+  bump.
 - Do not claim a lower MSRV than the dependency closure allows.
 
 Crate versions are taken from crates.io via `cargo add`, not from memory.

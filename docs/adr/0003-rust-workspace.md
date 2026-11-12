@@ -2,6 +2,7 @@
 
 - Status: accepted
 - Date: 2026-11-11
+- Amended: 2026-11-12 — the toolchain pin is an exact stable release.
 
 ## Context
 
@@ -12,8 +13,11 @@ second layout.
 
 ## Decision
 
-- Rust, edition 2024, stable toolchain. MSRV is 1.99, the stable release
-  used to build this foundation.
+- Rust, edition 2024. The toolchain in `rust-toolchain.toml` is one exact
+  stable release (currently 1.100.0), not the floating `stable` channel.
+  It moves only when that file changes. MSRV is 1.99, the stable release
+  used to build this foundation, and it is a separate number in
+  `Cargo.toml`.
 - A Cargo workspace with `resolver = "3"`.
 - `bomward-core` is the library.
 - `bomward-cli` is the binary, named `bomward`.
@@ -57,5 +61,8 @@ brief requires.
   only in `bomward-cli`.
 - `clap` is a CLI dependency, not a core dependency.
 - A third crate needs a new ADR.
-- The MSRV moves only by an ADR or by a documented toolchain bump in
-  `docs/DEVELOPMENT.md` when CI's stable channel requires it.
+- The pinned toolchain moves by a change to `rust-toolchain.toml`.
+  Dependabot can open that change. The MSRV moves only by a deliberate
+  change of `rust-version`, recorded in
+  [DEVELOPMENT.md](../DEVELOPMENT.md). A new stable release does not move
+  the MSRV.
