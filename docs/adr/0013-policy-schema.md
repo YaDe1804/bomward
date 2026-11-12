@@ -84,12 +84,15 @@ in `GPL-1.0+`, `GPL-2.0+`, `GPL-3.0+`, `LGPL-2.0+`, `LGPL-2.1+`, and
 not match `GPL-3.0-only`. The expansion applies both when the expression
 parses and when the token scan is used.
 
-`license_status: [unrecognized]` matches a considered string that is
-neither an SPDX id nor a valid expression, for example `GNU General
-Public License v3.0 only`. It applies to `added`, `license-changed`, and
-`version-changed` that carries the license flag. `change` must list at
-least one of those three. `any` is not enough. A string the token scan
-recognizes is not unrecognized.
+`license_status: [unrecognized]` matches when the whole string is neither
+exactly one SPDX id nor a valid SPDX expression. Ids found by the token
+scan still match `license` rules, so `GPL-3.0-only, see LICENSE` matches
+both. A zero-width space inside `AGPL-3.0-only`, or a fullwidth letter
+in front of `GPL-3.0-only`, is the same. `MIT`, `MIT OR Apache-2.0`, and
+`LicenseRef-acme` are one id or a valid expression and do not match.
+The matcher applies to `added`, `license-changed`, and `version-changed`
+that carries the license flag. `change` must list at least one of those
+three. `any` is not enough.
 
 Package patterns are compared with the canonical purl of the key, without
 version, as [ADR 0009](0009-purl-normalization.md) spells it
@@ -100,7 +103,12 @@ matches only that exact pattern. A pattern that does not start with
 `pkg:` is an error, except `**`. A key with qualifiers or a subpath
 matches only a pattern that names them, in the canonical sorted form the
 key stores, including percent-encoding.
-`pkg:npm/%40acme/*` does not match
+The pattern for that key is the canonical string itself:
+`pkg:npm/%40acme/tool?repository_url=https:%2F%2Fevil.example`.
+A qualifier section that is empty, unsorted, or still contains the raw
+characters is a validation error, and the message shows that spelling.
+An empty subpath after `#` is a validation error. `***` and any longer
+run of `*` are validation errors. `pkg:npm/%40acme/*` does not match
 `pkg:npm/%40acme/tool?repository_url=https:%2F%2Fevil.example`.
 
 An unencoded `@` in the namespace or the name is a validation error that

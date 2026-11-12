@@ -563,7 +563,7 @@ fn unrecognized_license_text_has_its_own_matcher() -> Result<(), Box<dyn std::er
     let token = added_license(&status, "GPL-3.0-only AND MyCustomLicense")?;
     assert_eq!(
         unit_kind(&token, ChangeKind::Added)?.configured,
-        Decision::Allow
+        Decision::Warn
     );
     let parsed = added_license(&status, "MIT")?;
     assert_eq!(
@@ -609,6 +609,52 @@ fn unrecognized_license_text_has_its_own_matcher() -> Result<(), Box<dyn std::er
     assert_eq!(
         unit_kind(&same, ChangeKind::VersionChanged)?.configured,
         Decision::Allow
+    );
+    Ok(())
+}
+
+#[test]
+fn unrecognized_stays_when_tokens_are_also_ids() -> Result<(), Box<dyn std::error::Error>> {
+    let agpl = both_rules("AGPL-3.0");
+    let gpl = both_rules("GPL-3.0-only");
+    let broken_agpl = format!("AGPL-3.0{}-only", '\u{200b}');
+    let fullwidth = format!("{}GPL-3.0-only", '\u{ff21}');
+    assert_both(&agpl, &broken_agpl)?;
+    assert_both(&gpl, &fullwidth)?;
+    assert_both(&gpl, "GPL-3.0-only, see LICENSE")?;
+
+    let status = rule(
+        "    when:\n      change: [added]\n      license_status: [unrecognized]\n    decision: warn\n",
+    );
+    for text in ["MIT", "MIT OR Apache-2.0", "LicenseRef-acme"] {
+        let verdict = added_license(&status, text)?;
+        assert_eq!(
+            unit_kind(&verdict, ChangeKind::Added)?.configured,
+            Decision::Allow,
+            "{text}"
+        );
+    }
+    Ok(())
+}
+
+fn both_rules(license: &str) -> String {
+    base(&format!(
+        "  - id: copyleft\n    when:\n      change: [added]\n      license: [{license}]\n    decision: deny\n  - id: status\n    when:\n      change: [added]\n      license_status: [unrecognized]\n    decision: warn\n"
+    ))
+}
+
+fn assert_both(text: &str, license: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let verdict = added_license(text, license)?;
+    let unit = unit_kind(&verdict, ChangeKind::Added)?;
+    assert!(
+        unit.rules.iter().any(|id| id == "copyleft"),
+        "{license} rules {:?}",
+        unit.rules
+    );
+    assert!(
+        unit.rules.iter().any(|id| id == "status"),
+        "{license} rules {:?}",
+        unit.rules
     );
     Ok(())
 }
@@ -746,6 +792,58 @@ fn package_patterns_do_not_skip_qualifiers() -> Result<(), Box<dyn std::error::E
         "    when:\n      change: [added]\n      package: [\"pkg:npm/@acme/*\"]\n    decision: deny\n",
     ))?;
     assert!(raw_at.to_string().contains("%40"), "{raw_at}");
+    Ok(())
+}
+
+#[test]
+fn qualifier_patterns_use_the_canonical_form() -> Result<(), Box<dyn std::error::Error>> {
+    const CANONICAL: &str = "pkg:npm/%40acme/tool?repository_url=https:%2F%2Fevil.example";
+    let old = empty_document();
+    let mut new = empty_document();
+    let mut qualifiers = BTreeMap::new();
+    qualifiers.insert(
+        "repository_url".to_owned(),
+        "https://evil.example".to_owned(),
+    );
+    put(
+        &mut new,
+        ComponentKey::Purl {
+            ty: "npm".to_owned(),
+            namespace: Some("@acme".to_owned()),
+            name: "tool".to_owned(),
+            qualifiers,
+            subpath: None,
+        },
+        "1.0.0",
+        DependencyRole::Direct,
+    );
+    let named = rule(&format!(
+        "    unless: [\"{CANONICAL}\"]\n    when:\n      change: [added]\n    decision: deny\n"
+    ));
+    let dropped = judge(&named, &old, &new)?;
+    assert_eq!(
+        unit_kind(&dropped, ChangeKind::Added)?.configured,
+        Decision::Allow
+    );
+
+    let rejected = [
+        (
+            "pkg:npm/%40acme/tool?repository_url=https://evil.example",
+            "https:%2F%2Fevil.example",
+        ),
+        ("pkg:npm/widget?b=1&a=2", "a=2&b=1"),
+        ("pkg:npm/widget?", "repository_url=https:%2F%2Fevil.example"),
+        ("pkg:npm/widget#", "subpath"),
+        ("***", "wildcard"),
+        ("****", "wildcard"),
+        ("pkg:npm/***", "wildcard"),
+    ];
+    for (pattern, hint) in rejected {
+        let error = policy_err(&rule(&format!(
+            "    when:\n      change: [added]\n      package: [\"{pattern}\"]\n    decision: deny\n"
+        )))?;
+        assert!(error.to_string().contains(hint), "{pattern} -> {error}");
+    }
     Ok(())
 }
 

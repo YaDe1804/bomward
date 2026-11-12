@@ -413,6 +413,19 @@ fn pattern_message(value: &str, error: PatternError) -> String {
         PatternError::Control => {
             "pattern contains a control character in the namespace or name".to_owned()
         }
+        PatternError::Stars => {
+            "a run of three or more '*' is not a wildcard; write * or **".to_owned()
+        }
+        PatternError::Qualifiers { expected } => {
+            format!(
+                "qualifiers must be the canonical form the key stores; write {}",
+                sanitize(&expected)
+            )
+        }
+        PatternError::EmptySubpath => {
+            "an empty subpath after '#' is not the form the key stores; drop the '#' or write the subpath"
+                .to_owned()
+        }
     }
 }
 

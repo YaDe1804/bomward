@@ -33,6 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `license_status: unrecognized` also matches a string that contains
+  SPDX ids when the whole string is not one id and not a valid
+  expression. Qualifiers in a package pattern must be the canonical
+  form the key stores, and `***` is rejected.
 - License matching keeps SPDX ids from a string that is not a valid
   expression, and `GPL-3.0+` matches both `GPL-3.0-or-later` and
   `GPL-3.0`. `license_status: [unrecognized]` matches free text.

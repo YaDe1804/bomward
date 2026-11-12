@@ -42,8 +42,13 @@ const EXPRESSION: ParseMode = ParseMode {
 /// Ids found in one license string, and whether the string is recognizable.
 pub(crate) struct LicenseFacts {
     /// Canonical SPDX ids the string contains.
+    ///
+    /// A failed parse still contributes every token that is an SPDX id.
     pub(crate) ids: BTreeSet<&'static str>,
-    /// True when the string parses, or when the token scan finds an id.
+    /// True when the whole string is one SPDX id or a valid SPDX expression.
+    ///
+    /// Tokens found beside other text do not set this. Those ids still
+    /// match `license` rules, and the string matches `license_status`.
     pub(crate) recognized: bool,
 }
 
@@ -52,14 +57,17 @@ pub(crate) fn canonical_license(name: &str) -> Option<&'static str> {
     index().get(&name.to_ascii_lowercase()).copied()
 }
 
-/// Ids in `text`, and whether the string is an SPDX id or expression.
+/// Ids in `text`, and whether the whole string is one id or an expression.
 ///
 /// A parse failure falls back to whole tokens. A token that is not an SPDX
-/// id is ignored. `LGPL-3.0-only` is not `GPL-3.0-only`.
+/// id is ignored. `LGPL-3.0-only` is not `GPL-3.0-only`. The string is
+/// recognized only when it is exactly one SPDX id, or when it parses.
+/// Tokens beside other text stay in [`LicenseFacts::ids`] and leave
+/// `recognized` false.
 pub(crate) fn analyze_license(text: &str) -> LicenseFacts {
     let canonical = canonicalize_expression(text);
-    if let Ok(expression) = Expression::parse_mode(&canonical, EXPRESSION) {
-        let mut ids = BTreeSet::new();
+    let mut ids = BTreeSet::new();
+    let parsed = if let Ok(expression) = Expression::parse_mode(&canonical, EXPRESSION) {
         for requirement in expression.requirements() {
             if let LicenseItem::Spdx { id, or_later } = &requirement.req.license {
                 if *or_later {
@@ -69,15 +77,15 @@ pub(crate) fn analyze_license(text: &str) -> LicenseFacts {
                 }
             }
         }
-        return LicenseFacts {
-            recognized: true,
-            ids,
-        };
+        true
+    } else {
+        scan_tokens(&canonical, &mut ids);
+        false
+    };
+    LicenseFacts {
+        ids,
+        recognized: parsed || canonical_license(text).is_some(),
     }
-    let mut ids = BTreeSet::new();
-    scan_tokens(&canonical, &mut ids);
-    let recognized = !ids.is_empty();
-    LicenseFacts { ids, recognized }
 }
 
 fn expand_plus(base: &'static str, ids: &mut BTreeSet<&'static str>) {
@@ -181,6 +189,11 @@ mod tests {
         assert!(contains("AGPL-3.0+", "AGPL-3.0-or-later"));
         assert!(!contains("AGPL-3.0+", "AGPL-3.0+"));
         assert!(!analyze_license("GNU General Public License v3.0 only").recognized);
-        assert!(analyze_license("GPL-3.0-only AND MyCustomLicense").recognized);
+        assert!(!analyze_license("GPL-3.0-only AND MyCustomLicense").recognized);
+        assert!(
+            analyze_license("GPL-3.0-only AND MyCustomLicense")
+                .ids
+                .contains("GPL-3.0-only")
+        );
     }
 }

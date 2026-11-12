@@ -6,7 +6,11 @@
 //! run other than `?` or `#`, including `/`. The exact pattern `**` matches
 //! every key, including one with qualifiers or a subpath. Every other
 //! character is literal. The match is a walk with a visited table, so a
-//! long pattern cannot backtrack exponentially.
+//! long pattern cannot backtrack exponentially. Qualifiers and the
+//! subpath are literal and must already be in the canonical form the key
+//! stores. A run of three or more `*` is rejected.
+
+use std::str::FromStr;
 
 /// A pattern compiled once at load.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -27,8 +31,8 @@ enum Atom {
     Glob,
 }
 
-/// Why a pattern was rejected. The text is a fixed sentence.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Why a pattern was rejected.
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum PatternError {
     /// The pattern is not `**` and does not start with `pkg:`.
     Prefix,
@@ -41,14 +45,25 @@ pub(crate) enum PatternError {
     },
     /// A control character in the namespace or name.
     Control,
+    /// Three or more `*` in a row.
+    Stars,
+    /// Qualifiers are missing or not in the key's canonical form.
+    Qualifiers {
+        /// The qualifier text the key would store.
+        expected: String,
+    },
+    /// A `#` with nothing after it.
+    EmptySubpath,
 }
 
 impl Pattern {
     pub(crate) fn compile(pattern: &str) -> Result<Self, PatternError> {
+        check_star_run(pattern)?;
         if pattern != "**" && !pattern.starts_with("pkg:") {
             return Err(PatternError::Prefix);
         }
         check_purl_encoding(pattern)?;
+        check_qualifiers(pattern)?;
         let mut atoms = Vec::new();
         let mut literal = String::new();
         let mut chars = pattern.chars().peekable();
@@ -146,6 +161,77 @@ fn glob_matches(dp: &[bool], width: usize, bytes: &[u8], atom: usize, start: usi
             Some(_) => k += 1,
         }
     }
+}
+
+fn check_star_run(pattern: &str) -> Result<(), PatternError> {
+    let mut run = 0u32;
+    for ch in pattern.chars() {
+        if ch == '*' {
+            run = run.saturating_add(1);
+            if run >= 3 {
+                return Err(PatternError::Stars);
+            }
+        } else {
+            run = 0;
+        }
+    }
+    Ok(())
+}
+
+/// Qualifier text in the form `PackageUrl` stores it, as in the policy docs.
+const QUALIFIER_EXAMPLE: &str = "repository_url=https:%2F%2Fevil.example";
+
+fn check_qualifiers(pattern: &str) -> Result<(), PatternError> {
+    if pattern == "**" {
+        return Ok(());
+    }
+    let Some((_, after_query)) = pattern.split_once('?') else {
+        return check_bare_subpath(pattern);
+    };
+    let (query, subpath) = match after_query.split_once('#') {
+        Some((query, subpath)) => (query, Some(subpath)),
+        None => (after_query, None),
+    };
+    if query.is_empty() {
+        return Err(PatternError::Qualifiers {
+            expected: QUALIFIER_EXAMPLE.to_owned(),
+        });
+    }
+    let synthetic = format!("pkg:generic/name?{query}");
+    let rendered = packageurl::PackageUrl::from_str(&synthetic)
+        .ok()
+        .and_then(|purl| {
+            purl.to_string()
+                .split_once('?')
+                .map(|(_, qualifiers)| qualifiers.to_owned())
+        });
+    match rendered {
+        Some(expected) if expected == query => {}
+        Some(expected) => return Err(PatternError::Qualifiers { expected }),
+        None => {
+            return Err(PatternError::Qualifiers {
+                expected: QUALIFIER_EXAMPLE.to_owned(),
+            });
+        }
+    }
+    if let Some(subpath) = subpath {
+        check_subpath_text(subpath)?;
+    }
+    Ok(())
+}
+
+fn check_bare_subpath(pattern: &str) -> Result<(), PatternError> {
+    if let Some((_, subpath)) = pattern.split_once('#') {
+        check_subpath_text(subpath)?;
+    }
+    Ok(())
+}
+
+fn check_subpath_text(subpath: &str) -> Result<(), PatternError> {
+    if subpath.is_empty() {
+        return Err(PatternError::EmptySubpath);
+    }
+    Ok(())
 }
 
 fn check_purl_encoding(pattern: &str) -> Result<(), PatternError> {
@@ -247,7 +333,7 @@ mod tests {
         let universal = Pattern::compile("**")?;
         assert!(universal.universal);
         assert!(universal.matches("pkg:npm/a/b"));
-        assert_eq!(Pattern::compile("***"), Err(PatternError::Prefix));
+        assert_eq!(Pattern::compile("***"), Err(PatternError::Stars));
         Ok(())
     }
 

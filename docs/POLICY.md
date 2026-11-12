@@ -123,14 +123,17 @@ rule for `GPL-3.0-or-later` and a rule for `GPL-3.0`. It does not match
 `GPL-3.0-only`. The same expansion is used when the expression parses
 (`CDDL-1.0+` contains `CDDL-1.0`) and when it does not (`GPL-3.0+`).
 
-`license_status: [unrecognized]` matches when a considered string is
-neither an SPDX id nor a valid expression. `GNU General Public License
-v3.0 only` is unrecognized. `GPL-3.0-only AND MyCustomLicense` is not,
-because the token scan finds `GPL-3.0-only`. The matcher applies to
-`added`, to `license-changed`, and to `version-changed` that carries the
-license flag. A version update that keeps the same license text does not
-match. `change` must list at least one of those three kinds. `any` is not
-enough.
+`license_status: [unrecognized]` matches when the whole string is neither
+exactly one SPDX id nor a valid SPDX expression. Ids the token scan finds
+in that string still match `license` rules. Both can be true at once.
+`GPL-3.0-only, see LICENSE` matches a rule for `GPL-3.0-only` and a rule
+for `unrecognized`. So does `AGPL-3.0` with a zero-width space before
+`-only`, and a fullwidth `A` in front of `GPL-3.0-only`. `MIT` is one id.
+`MIT OR Apache-2.0` and `LicenseRef-acme` are valid expressions. None of
+those three matches `license_status`. The matcher applies to `added`, to
+`license-changed`, and to `version-changed` that carries the license
+flag. A version update that keeps the same license text does not match.
+`change` must list at least one of those three kinds. `any` is not enough.
 
 On a `license-changed` row, and on a `version-changed` row whose licenses
 differ, only the license strings that were added are scanned. A license
@@ -193,17 +196,30 @@ is also an error.
 
 `*` and `**` never match across `?` or `#`. A key that has qualifiers or a
 subpath matches only a pattern that names them. Qualifiers are written in
-the same canonical, sorted form as the key, including percent-encoding.
-`pkg:npm/%40acme/*` does not match
-`pkg:npm/%40acme/tool?repository_url=https:%2F%2Fevil.example`.
-`pkg:npm/%40acme/*?repository_url=https:%2F%2Fevil.example` does.
+the canonical form the key stores: lowercase keys, sorted, values
+percent-encoded. Namespace `@acme`, name `tool`, and qualifier
+`repository_url` = `https://evil.example` are stored, and written as a
+pattern, like this:
+
+```text
+pkg:npm/%40acme/tool?repository_url=https:%2F%2Fevil.example
+```
+
+`/` in the value is `%2F`. A pattern whose qualifier text is not that
+form is an error, and the message shows the canonical spelling. That
+includes a raw `https://`, keys that are not sorted (`b=1&a=2` is
+`a=2&b=1`), and an empty section after `?`. An empty subpath after `#`
+is an error. `pkg:npm/%40acme/*` does not match the URL above.
+`pkg:npm/%40acme/*?repository_url=https:%2F%2Fevil.example` does, because
+the qualifier text is the canonical one.
 
 The exact pattern `**` still matches every key, including one with
 qualifiers or a subpath, and a component that has no package URL.
 `pkg:**` does not: the `**` stops at `?` and `#`.
 
 A pattern must start with `pkg:`, except the exact pattern `**`.
-`***` is rejected.
+`***` and any longer run of `*` are rejected. The wildcards are `*` and
+`**`.
 
 A component that has no package URL, only `group` and `name`, matches the
 exact pattern `**` and nothing else. `pkg:**` does not name it.
