@@ -1,0 +1,47 @@
+# Starting policy. mode warn turns every deny into a warning, so the
+# exit code stays 0 until you switch the file to enforce.
+version: 1
+mode: warn
+default: allow
+rules:
+  - id: no-downgrade
+    description: A downgrade needs a person to look at it before it lands.
+    when:
+      change: [version-changed]
+      direction: [downgrade]
+    decision: deny
+
+  - id: no-hash-contradiction
+    description: One algorithm must not carry two different contents.
+    when:
+      change: [hash-changed]
+    decision: deny
+
+  - id: no-dropped-hash
+    description: Removing a hash algorithm drops a check the old document had.
+    when:
+      change: [hash-coverage-changed]
+      coverage: [algorithm-removed, all-dropped]
+    decision: deny
+
+  - id: no-strong-copyleft
+    description: >
+      A license string that newly offers GPL or AGPL needs a review.
+      Deprecated ids are listed so they cannot slip past the -only form.
+    when:
+      change: [license-changed]
+      license:
+        - AGPL-3.0
+        - AGPL-3.0-only
+        - GPL-2.0
+        - GPL-2.0-only
+        - GPL-3.0
+        - GPL-3.0-only
+    decision: deny
+
+  - id: new-direct
+    description: A new direct dependency is worth seeing. It does not fail the run.
+    when:
+      change: [added]
+      role: [direct]
+    decision: warn
