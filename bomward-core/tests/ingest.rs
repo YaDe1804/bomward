@@ -155,7 +155,7 @@ fn component_order_does_not_change_the_model() -> Result<(), String> {
 
 #[test]
 fn lockward_shaped_npm_document_is_read() -> Result<(), String> {
-    let bytes = fixture("lockward-npm-1.6.json")?;
+    let bytes = fixture("lockward-old.cdx.json")?;
     let document = read_default(&bytes).map_err(|error| error.to_string())?;
     let (scoped, component) = find(&document, "left-pad")?;
     let ComponentKey::Purl {
@@ -198,20 +198,23 @@ fn lockward_shaped_npm_document_is_read() -> Result<(), String> {
     if scoped_scopes.len() != 1 || other_scopes.len() != 1 || scoped_scopes == other_scopes {
         return Err(format!("scopes {scoped_scopes:?} and {other_scopes:?}"));
     }
+    let left_pad_role = component
+        .versions
+        .values()
+        .next()
+        .map(|stored| stored.role)
+        .ok_or("missing left-pad role")?;
+    if left_pad_role != DependencyRole::Direct {
+        return Err(format!("left-pad role {left_pad_role:?}"));
+    }
     if document
         .warnings
         .iter()
         .any(|warning| warning.kind == WarningKind::RoleUnknown)
-        && document.components.values().all(|component| {
-            component
-                .versions
-                .values()
-                .all(|stored| stored.role == DependencyRole::Unknown)
-        })
     {
-        return Ok(());
+        return Err(format!("{:?}", document.warnings));
     }
-    Err("a document without dependencies should be unknown".to_owned())
+    Ok(())
 }
 
 #[test]
