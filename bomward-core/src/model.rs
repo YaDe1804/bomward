@@ -245,7 +245,7 @@ pub struct ContentHash {
 
 /// How one version relates to the root of this document.
 ///
-/// AP2 decides how a report prints these. Ingest only records them.
+/// The diff copies the role onto each change. The report prints it.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum DependencyRole {
