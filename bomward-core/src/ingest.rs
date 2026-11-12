@@ -545,6 +545,12 @@ fn assemble(inventory: decode::Inventory, duplicate_key: bool) -> Result<Documen
         None => false,
     };
     assembler.classify(dependencies_present);
+    if assembler.components.is_empty() {
+        assembler.warnings.insert(Warning {
+            key: None,
+            kind: WarningKind::NoComponents,
+        });
+    }
     if duplicate_key {
         assembler.warnings.insert(Warning {
             key: None,

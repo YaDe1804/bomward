@@ -130,6 +130,7 @@ one warning.
 | `version-mismatch` | The component `version` and the purl version differ. The purl version is stored. |
 | `duplicate-key` | A JSON object repeated a key. The last value is kept. The warning has no component key. |
 | `unreachable` | A `dependencies` field and a root are present, and a version stayed `unknown`. Text: `component is not reachable from the root`. One warning per key. |
+| `no-components` | The document has no components. Text: `document contains no components`. The warning has no component key. A document that only has `metadata.component` is not empty. |
 
 Warnings do not change the error returned for a valid document. They do
 not change the exit code (ADR 0005).

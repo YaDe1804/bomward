@@ -303,6 +303,11 @@ pub enum WarningKind {
     ///
     /// Several unreachable versions of one key produce one warning.
     Unreachable,
+    /// The document has no components at all. Id: `no-components`.
+    ///
+    /// A service BOM can be valid and still name nothing. The warning has
+    /// no component key.
+    NoComponents,
 }
 
 impl WarningKind {
@@ -318,6 +323,7 @@ impl WarningKind {
             Self::VersionMismatch => "version-mismatch",
             Self::DuplicateKey => "duplicate-key",
             Self::Unreachable => "unreachable",
+            Self::NoComponents => "no-components",
         }
     }
 
@@ -333,6 +339,7 @@ impl WarningKind {
             Self::VersionMismatch => "component version differs from purl version",
             Self::DuplicateKey => "json object contains a duplicate key",
             Self::Unreachable => "component is not reachable from the root",
+            Self::NoComponents => "document contains no components",
         }
     }
 }

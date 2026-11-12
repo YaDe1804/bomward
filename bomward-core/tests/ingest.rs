@@ -935,6 +935,43 @@ fn arbitrary_bytes_do_not_panic() -> Result<(), String> {
 }
 
 #[test]
+fn a_document_with_no_components_warns() -> Result<(), String> {
+    let empty = read_default(br#"{"bomFormat":"CycloneDX","specVersion":"1.6"}"#)
+        .map_err(|error| error.to_string())?;
+    let warnings = empty
+        .warnings
+        .iter()
+        .filter(|warning| warning.kind == WarningKind::NoComponents)
+        .count();
+    if warnings != 1 || !empty.components.is_empty() {
+        return Err(format!("{:?}", empty.warnings));
+    }
+    let warning = empty
+        .warnings
+        .iter()
+        .find(|warning| warning.kind == WarningKind::NoComponents)
+        .ok_or("missing warning")?;
+    if warning.kind.id() != "no-components"
+        || warning.kind.message() != "document contains no components"
+        || warning.key.is_some()
+    {
+        return Err(format!("{warning:?}"));
+    }
+    let root_only = read_default(
+        br#"{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"name":"app","version":"1"}}}"#,
+    )
+    .map_err(|error| error.to_string())?;
+    if root_only
+        .warnings
+        .iter()
+        .any(|warning| warning.kind == WarningKind::NoComponents)
+    {
+        return Err(format!("{:?}", root_only.warnings));
+    }
+    Ok(())
+}
+
+#[test]
 fn one_hundred_thousand_components_are_read() -> Result<(), String> {
     let mut json = String::from(r#"{"bomFormat":"CycloneDX","specVersion":"1.6","components":["#);
     json.reserve(8_000_000);

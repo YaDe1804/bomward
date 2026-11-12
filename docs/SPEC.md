@@ -68,7 +68,9 @@ versions of one package can have two roles.
 with no `metadata.component`, or with no `dependencies` field, marks every
 version unknown and counts one warning, `role-unknown`. When the graph
 is present, a version that stays unknown also counts one warning,
-`unreachable`, once per component key. `scope` in a
+`unreachable`, once per component key. A document with no components
+warns `no-components`. A document that only names `metadata.component`
+is not empty. `scope` in a
 component is only the CycloneDX field. `bom-ref` is never compared
 across the two documents.
 
