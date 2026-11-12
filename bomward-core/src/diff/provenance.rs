@@ -34,8 +34,7 @@ impl Provenance {
         });
         let parent = root_node
             .as_ref()
-            .map(|node| shortest_parents(node, &document.dependencies))
-            .unwrap_or_default();
+            .map_or_default(|node| shortest_parents(node, &document.dependencies));
         Self {
             dependents,
             parent,
@@ -47,8 +46,7 @@ impl Provenance {
         let nodes = self
             .dependents
             .get(node)
-            .map(|sources| sources.iter().cloned().collect::<Vec<_>>())
-            .unwrap_or_default();
+            .map_or_default(|sources| sources.iter().cloned().collect::<Vec<_>>());
         bound(nodes, INTRODUCED_BY_LIMIT)
     }
 
