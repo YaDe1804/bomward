@@ -60,23 +60,55 @@ The role is the new document's role, and for `removed` the old one. With
 `unknown` and `transitive`. A missing graph must not make a direct-dependency
 rule go quiet.
 
-A license id matches when `spdx` parses the license string and that id is
-one of the expression's license tokens, compared without regard to case.
-`GPL-3.0-only` does not match `LGPL-3.0-only`. `GPL-3.0` does not match
-`GPL-3.0-or-later`. The version after the change is scanned. For `removed`,
-that is the old version. For `license-changed`, and for a `version-changed`
-that carries the license flag, only the license strings that were added
-are scanned. `MIT OR GPL-3.0-only` matches `GPL-3.0-only`. A choice in the
-expression does not hide an id. A string that is not a valid SPDX
-expression matches nothing.
+A license id matches an SPDX id inside a license string, compared without
+regard to case and not as a substring. `GPL-3.0-only` does not match
+`LGPL-3.0-only`. `GPL-3.0` does not match `GPL-3.0-or-later`. The version
+after the change is scanned. For `removed`, that is the old version. For
+`license-changed`, and for a `version-changed` that carries the license
+flag, only the license strings that were added are scanned. `MIT OR
+GPL-3.0-only` matches `GPL-3.0-only`. A choice in the expression does not
+hide an id. Those strings are analyzed once per unit.
+
+When the string is not a valid SPDX expression, it is split into tokens
+on ASCII letters, digits, `-`, and `.`. Every token that is an SPDX id
+counts. `GPL-3.0-only AND MyCustomLicense`, `GPL-3.0-only AND`,
+`GPL-3.0-only/MIT`, and `GPL-3.0-only, see LICENSE` all contain
+`GPL-3.0-only`. `LGPL-3.0-only AND MyCustomLicense` does not.
+
+SPDX 2.3 allows `+` immediately after any license id, with no space, for
+"this version or any later version". The string then contains the id,
+`{id}-or-later` when that identifier exists, and the deprecated `{id}+`
+identifier when license list 3.29 still has it. That list embeds `+` only
+in `GPL-1.0+`, `GPL-2.0+`, `GPL-3.0+`, `LGPL-2.0+`, `LGPL-2.1+`, and
+`LGPL-3.0+`. `GPL-3.0+` matches `GPL-3.0-or-later` and `GPL-3.0`, and does
+not match `GPL-3.0-only`. The expansion applies both when the expression
+parses and when the token scan is used.
+
+`license_status: [unrecognized]` matches a considered string that is
+neither an SPDX id nor a valid expression, for example `GNU General
+Public License v3.0 only`. It applies to `added`, `license-changed`, and
+`version-changed` that carries the license flag. `change` must list at
+least one of those three. `any` is not enough. A string the token scan
+recognizes is not unrecognized.
 
 Package patterns are compared with the canonical purl of the key, without
 version, as [ADR 0009](0009-purl-normalization.md) spells it
-(`pkg:npm/%40acme/tool`). `*` is any run of characters other than `/`.
-`**` is any run, including `/`. No other character is special. A component
-whose key is `group` plus `name` matches only a pattern that is exactly
-`**`. A pattern that does not start with `pkg:` is an error, except `**`.
-The pattern is literal against that canonical text, so `@` is not `%40`.
+(`pkg:npm/%40acme/tool`). `*` is any run other than `/`, `?`, or `#`.
+`**` is any run other than `?` or `#`, including `/`. The exact pattern
+`**` matches every key. A component whose key is `group` plus `name`
+matches only that exact pattern. A pattern that does not start with
+`pkg:` is an error, except `**`. A key with qualifiers or a subpath
+matches only a pattern that names them, in the canonical sorted form the
+key stores, including percent-encoding.
+`pkg:npm/%40acme/*` does not match
+`pkg:npm/%40acme/tool?repository_url=https:%2F%2Fevil.example`.
+
+An unencoded `@` in the namespace or the name is a validation error that
+tells the author to write `%40`. The same error covers the other
+characters `packageurl` 0.7.1 percent-encodes in a namespace or name:
+space, `"`, `%` outside a `%HH` escape, `<`, `>`, a backtick, `{`, `}`, `;`,
+`=`, `+`, `\`, `[`, `]`, `^`, `|`, and control characters. `/` stays the
+segment separator. `?` and `#` stay the qualifier and subpath markers.
 
 `scope` is the scope set after the change. An empty set is `required`,
 the same default the diff uses. `missing` means the version after the
@@ -127,11 +159,13 @@ A generated SBOM with no graph would otherwise sail through every
 Scanning every license id in an `OR` expression is the stricter reading.
 A dual-licensed package that may be taken under GPL still brought GPL
 into the tree. The alternative, matching only when every choice is
-denied, would hide that.
+denied, would hide that. Treating an unparsed string as empty would hide
+it too: `GPL-3.0-only AND MyCustomLicense` would walk past a GPL rule.
 
 `**` as the only pattern for a name key avoids a guess. `pkg:npm/*` does
 not name that component, and pretending it does would deny or allow a
-package the pattern did not mention.
+package the pattern did not mention. Letting `*` or `**` cross `?` or
+`#` would do the same for a qualifier the pattern did not mention.
 
 ## Alternatives
 
@@ -146,7 +180,11 @@ package the pattern did not mention.
   one this gate is for.
 - Compare package patterns to the raw purl text from the SBOM. Rejected:
   [ADR 0009](0009-purl-normalization.md) already decided the canonical
-  form. Patterns follow it, including `%40`.
+  form. Patterns follow it, including `%40`. An unencoded `@` is an
+  error, not a silent miss.
+- Let a wildcard consume qualifiers. Rejected: `unless:
+  ["pkg:npm/%40acme/*"]` would also skip a component whose qualifier
+  points somewhere else.
 
 ## Consequences
 

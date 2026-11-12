@@ -25,17 +25,36 @@ rules:
     decision: deny
 
   - id: no-strong-copyleft
-    description: A license string that newly offers GPL or AGPL fails the run.
+    description: >
+      A new dependency, or a license string that newly offers GPL or AGPL,
+      fails the run. -or-later ids are listed with the deprecated forms.
     when:
-      change: [license-changed]
+      change: [added, license-changed]
       license:
         - AGPL-3.0
         - AGPL-3.0-only
+        - AGPL-3.0-or-later
         - GPL-2.0
         - GPL-2.0-only
+        - GPL-2.0-or-later
         - GPL-3.0
         - GPL-3.0-only
+        - GPL-3.0-or-later
     decision: deny
+
+  - id: scope-becomes-required
+    description: An excluded or optional dependency became a runtime dependency.
+    when:
+      change: [scope-changed]
+      scope: [required]
+    decision: warn
+
+  - id: unrecognized-license
+    description: A license string that is neither an SPDX id nor an SPDX expression.
+    when:
+      change: [added, license-changed, version-changed]
+      license_status: [unrecognized]
+    decision: warn
 
   - id: new-direct
     description: A new direct dependency warns.

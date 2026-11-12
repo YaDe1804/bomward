@@ -97,6 +97,7 @@ pub(crate) struct ChangeRule {
     pub(crate) roles: Option<BTreeSet<RoleMatch>>,
     pub(crate) directions: Option<BTreeSet<Direction>>,
     pub(crate) licenses: Option<Vec<&'static str>>,
+    pub(crate) license_status: Option<BTreeSet<LicenseStatus>>,
     pub(crate) missing: Option<BTreeSet<MissingAttr>>,
     pub(crate) coverage: Option<BTreeSet<CoverageKind>>,
     pub(crate) scopes: Option<BTreeSet<ScopeMatch>>,
@@ -119,6 +120,13 @@ pub(crate) enum RoleMatch {
     Direct,
     Transitive,
     Unknown,
+}
+
+/// `license_status` values.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub(crate) enum LicenseStatus {
+    /// The string is neither an SPDX id nor a valid SPDX expression.
+    Unrecognized,
 }
 
 /// `missing` values.

@@ -2,9 +2,11 @@
 
 //! Package patterns from ADR 0013.
 //!
-//! `*` is any run of characters other than `/`. `**` is any run, including
-//! `/`. Every other character is literal. The match is a walk with a visited
-//! table, so a long pattern cannot backtrack exponentially.
+//! `*` is any run of characters other than `/`, `?`, or `#`. `**` is any
+//! run other than `?` or `#`, including `/`. The exact pattern `**` matches
+//! every key, including one with qualifiers or a subpath. Every other
+//! character is literal. The match is a walk with a visited table, so a
+//! long pattern cannot backtrack exponentially.
 
 /// A pattern compiled once at load.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -19,9 +21,9 @@ pub(crate) struct Pattern {
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum Atom {
     Text(String),
-    /// `*`: any run that does not contain `/`, including empty.
+    /// `*`: any run that does not contain `/`, `?`, or `#`, including empty.
     Star,
-    /// `**`: any run, including `/` and empty.
+    /// `**`: any run that does not contain `?` or `#`, including `/` and empty.
     Glob,
 }
 
@@ -30,6 +32,15 @@ enum Atom {
 pub(crate) enum PatternError {
     /// The pattern is not `**` and does not start with `pkg:`.
     Prefix,
+    /// A namespace or name character that the canonical key percent-encodes.
+    Unencoded {
+        /// The character the author wrote.
+        found: char,
+        /// The encoding the key stores, such as `%40`.
+        write: &'static str,
+    },
+    /// A control character in the namespace or name.
+    Control,
 }
 
 impl Pattern {
@@ -37,6 +48,7 @@ impl Pattern {
         if pattern != "**" && !pattern.starts_with("pkg:") {
             return Err(PatternError::Prefix);
         }
+        check_purl_encoding(pattern)?;
         let mut atoms = Vec::new();
         let mut literal = String::new();
         let mut chars = pattern.chars().peekable();
@@ -61,6 +73,9 @@ impl Pattern {
     }
 
     pub(crate) fn matches(&self, text: &str) -> bool {
+        if self.universal {
+            return true;
+        }
         let n = self.atoms.len();
         let m = text.len();
         let Some(width) = m.checked_add(1) else {
@@ -79,7 +94,7 @@ impl Pattern {
                         text_at(bytes, j, literal).is_some_and(|next| get(&dp, width, i + 1, next))
                     }
                     Some(Atom::Star) => star_matches(&dp, width, bytes, i, j),
-                    Some(Atom::Glob) => glob_matches(&dp, width, m, i, j),
+                    Some(Atom::Glob) => glob_matches(&dp, width, bytes, i, j),
                     None => false,
                 };
                 if matched {
@@ -114,23 +129,80 @@ fn star_matches(dp: &[bool], width: usize, bytes: &[u8], atom: usize, start: usi
             return true;
         }
         match bytes.get(k) {
-            Some(b'/') | None => return false,
+            Some(b'/' | b'?' | b'#') | None => return false,
             Some(_) => k += 1,
         }
     }
 }
 
-fn glob_matches(dp: &[bool], width: usize, len: usize, atom: usize, start: usize) -> bool {
+fn glob_matches(dp: &[bool], width: usize, bytes: &[u8], atom: usize, start: usize) -> bool {
     let mut k = start;
     loop {
         if get(dp, width, atom + 1, k) {
             return true;
         }
-        if k >= len {
-            return false;
+        match bytes.get(k) {
+            Some(b'?' | b'#') | None => return false,
+            Some(_) => k += 1,
         }
-        k += 1;
     }
+}
+
+fn check_purl_encoding(pattern: &str) -> Result<(), PatternError> {
+    if pattern == "**" {
+        return Ok(());
+    }
+    let path = pattern.split(['?', '#']).next().unwrap_or(pattern);
+    let mut chars = path.chars();
+    while let Some(ch) = chars.next() {
+        if ch == '%' {
+            let hex = chars.next().is_some_and(|item| item.is_ascii_hexdigit())
+                && chars.next().is_some_and(|item| item.is_ascii_hexdigit());
+            if !hex {
+                return Err(PatternError::Unencoded {
+                    found: '%',
+                    write: "%25",
+                });
+            }
+            continue;
+        }
+        if ch == '/' || ch == '*' || ch == ':' {
+            continue;
+        }
+        if ch.is_control() {
+            return Err(PatternError::Control);
+        }
+        if let Some(write) = encoded_literal(ch) {
+            return Err(PatternError::Unencoded { found: ch, write });
+        }
+    }
+    Ok(())
+}
+
+/// Percent-encoding of a character in a canonical namespace or name.
+///
+/// `packageurl` 0.7.1 encodes these, plus `/` (a segment separator here),
+/// `#` and `?` (the qualifier and subpath markers), and `%` (an escape).
+fn encoded_literal(ch: char) -> Option<&'static str> {
+    Some(match ch {
+        ' ' => "%20",
+        '"' => "%22",
+        '<' => "%3C",
+        '>' => "%3E",
+        '`' => "%60",
+        '{' => "%7B",
+        '}' => "%7D",
+        ';' => "%3B",
+        '=' => "%3D",
+        '+' => "%2B",
+        '@' => "%40",
+        '\\' => "%5C",
+        '[' => "%5B",
+        ']' => "%5D",
+        '^' => "%5E",
+        '|' => "%7C",
+        _ => return None,
+    })
 }
 
 fn index(width: usize, row: usize, column: usize) -> Option<usize> {
@@ -183,6 +255,27 @@ mod tests {
     fn a_pattern_must_name_a_purl_or_everything() -> Result<(), PatternError> {
         assert_eq!(Pattern::compile("npm/*"), Err(PatternError::Prefix));
         Pattern::compile("pkg:npm/%40acme/*")?;
+        Ok(())
+    }
+
+    #[test]
+    fn wildcards_do_not_cross_qualifiers_or_subpath() -> Result<(), PatternError> {
+        let qualified = "pkg:npm/%40acme/tool?repository_url=https:%2F%2Fevil.example";
+        let star = Pattern::compile("pkg:npm/%40acme/*")?;
+        assert!(!star.matches(qualified));
+        assert!(!star.matches("pkg:npm/%40acme/tool#src"));
+        assert!(star.matches("pkg:npm/%40acme/tool"));
+        let glob = Pattern::compile("pkg:npm/**")?;
+        assert!(!glob.matches(qualified));
+        assert!(glob.matches("pkg:npm/%40acme/tool"));
+        let explicit =
+            Pattern::compile("pkg:npm/%40acme/*?repository_url=https:%2F%2Fevil.example")?;
+        assert!(explicit.matches(qualified));
+        let all = Pattern::compile("**")?;
+        assert!(all.matches(qualified));
+        let pkg_glob = Pattern::compile("pkg:**")?;
+        assert!(!pkg_glob.matches(qualified));
+        assert!(pkg_glob.matches("pkg:npm/%40acme/tool"));
         Ok(())
     }
 }

@@ -156,7 +156,9 @@ fn required_fields_and_unknown_fields_are_errors() -> Result<(), String> {
         "{missing}"
     );
     let unknown = policy_err("version: 1\nmode: enforce\ndefault: allow\nrules: []\nowner: ada\n")?;
-    assert!(unknown.to_string().contains("line "), "{unknown}");
+    let unknown_text = unknown.to_string();
+    assert_eq!(unknown_text.matches("line").count(), 1, "{unknown_text}");
+    assert_eq!(unknown_text.matches("column").count(), 1, "{unknown_text}");
     let rule = policy_err(&rule(
         "    extra: 1\n    when:\n      change: [any]\n    decision: deny\n",
     ))?;
@@ -227,6 +229,10 @@ fn illegal_combinations_are_errors() -> Result<(), String> {
         (
             "    when:\n      change: [license-changed]\n      license: [not-a-license]\n    decision: deny\n",
             "unknown value",
+        ),
+        (
+            "    when:\n      change: [any]\n      license_status: [unrecognized]\n    decision: deny\n",
+            "license_status requires",
         ),
         (
             "    when:\n      package: [\"npm/*\"]\n    decision: deny\n",
@@ -492,6 +498,133 @@ fn license_tokens_do_not_match_a_longer_id() -> Result<(), Box<dyn std::error::E
 }
 
 #[test]
+fn unparsed_license_text_still_contains_spdx_ids() -> Result<(), Box<dyn std::error::Error>> {
+    let gpl = rule(
+        "    when:\n      change: [added]\n      license: [GPL-3.0-only]\n    decision: deny\n",
+    );
+    let texts = [
+        "GPL-3.0-only AND MyCustomLicense",
+        "GPL-3.0-only AND",
+        "GPL-3.0-only/MIT",
+        "GPL-3.0-only, see LICENSE",
+    ];
+    for text in texts {
+        let verdict = added_license(&gpl, text)?;
+        assert_eq!(
+            unit_kind(&verdict, ChangeKind::Added)?.configured,
+            Decision::Deny,
+            "{text}"
+        );
+    }
+    let lgpl = added_license(&gpl, "LGPL-3.0-only AND MyCustomLicense")?;
+    assert_eq!(
+        unit_kind(&lgpl, ChangeKind::Added)?.configured,
+        Decision::Allow
+    );
+    Ok(())
+}
+
+#[test]
+fn a_plus_suffix_matches_or_later_and_the_deprecated_id() -> Result<(), Box<dyn std::error::Error>>
+{
+    let later = rule(
+        "    when:\n      change: [added]\n      license: [GPL-3.0-or-later]\n    decision: deny\n",
+    );
+    let bare =
+        rule("    when:\n      change: [added]\n      license: [GPL-3.0]\n    decision: deny\n");
+    let only = rule(
+        "    when:\n      change: [added]\n      license: [GPL-3.0-only]\n    decision: deny\n",
+    );
+    assert_eq!(
+        unit_kind(&added_license(&later, "GPL-3.0+")?, ChangeKind::Added)?.configured,
+        Decision::Deny
+    );
+    assert_eq!(
+        unit_kind(&added_license(&bare, "GPL-3.0+")?, ChangeKind::Added)?.configured,
+        Decision::Deny
+    );
+    assert_eq!(
+        unit_kind(&added_license(&only, "GPL-3.0+")?, ChangeKind::Added)?.configured,
+        Decision::Allow
+    );
+    Ok(())
+}
+
+#[test]
+fn unrecognized_license_text_has_its_own_matcher() -> Result<(), Box<dyn std::error::Error>> {
+    let status = rule(
+        "    when:\n      change: [added]\n      license_status: [unrecognized]\n    decision: warn\n",
+    );
+    let free = added_license(&status, "GNU General Public License v3.0 only")?;
+    assert_eq!(
+        unit_kind(&free, ChangeKind::Added)?.configured,
+        Decision::Warn
+    );
+    let token = added_license(&status, "GPL-3.0-only AND MyCustomLicense")?;
+    assert_eq!(
+        unit_kind(&token, ChangeKind::Added)?.configured,
+        Decision::Allow
+    );
+    let parsed = added_license(&status, "MIT")?;
+    assert_eq!(
+        unit_kind(&parsed, ChangeKind::Added)?.configured,
+        Decision::Allow
+    );
+
+    let gpl = rule(
+        "    when:\n      change: [added]\n      license: [GPL-3.0-only]\n    decision: deny\n",
+    );
+    let not_gpl = added_license(&gpl, "GNU General Public License v3.0 only")?;
+    assert_eq!(
+        unit_kind(&not_gpl, ChangeKind::Added)?.configured,
+        Decision::Allow
+    );
+
+    let key = npm("widget");
+    let mut old = empty_document();
+    let mut updated = empty_document();
+    put(&mut old, key.clone(), "1.0.0", DependencyRole::Direct);
+    put(&mut updated, key.clone(), "2.0.0", DependencyRole::Direct);
+    attrs(&mut old, &key, "1.0.0")?
+        .licenses
+        .insert("MIT".to_owned());
+    attrs(&mut updated, &key, "2.0.0")?
+        .licenses
+        .insert("GNU General Public License v3.0 only".to_owned());
+    let on_update = rule(
+        "    when:\n      change: [version-changed]\n      license_status: [unrecognized]\n    decision: warn\n",
+    );
+    let changed = judge(&on_update, &old, &updated)?;
+    assert_eq!(
+        unit_kind(&changed, ChangeKind::VersionChanged)?.configured,
+        Decision::Warn
+    );
+
+    let mut kept = empty_document();
+    put(&mut kept, key.clone(), "3.0.0", DependencyRole::Direct);
+    attrs(&mut kept, &key, "3.0.0")?
+        .licenses
+        .insert("GNU General Public License v3.0 only".to_owned());
+    let same = judge(&on_update, &updated, &kept)?;
+    assert_eq!(
+        unit_kind(&same, ChangeKind::VersionChanged)?.configured,
+        Decision::Allow
+    );
+    Ok(())
+}
+
+fn added_license(text: &str, license: &str) -> Result<Verdict, Box<dyn std::error::Error>> {
+    let key = npm("widget");
+    let old = empty_document();
+    let mut new = empty_document();
+    put(&mut new, key.clone(), "1.0.0", DependencyRole::Direct);
+    attrs(&mut new, &key, "1.0.0")?
+        .licenses
+        .insert(license.to_owned());
+    Ok(judge(text, &old, &new)?)
+}
+
+#[test]
 fn package_patterns_use_the_canonical_purl() -> Result<(), Box<dyn std::error::Error>> {
     let old = empty_document();
     let mut new = empty_document();
@@ -530,11 +663,10 @@ fn package_patterns_use_the_canonical_purl() -> Result<(), Box<dyn std::error::E
             .count(),
         1
     );
-    let raw_at = rule(
+    let raw_at = policy_err(&rule(
         "    when:\n      change: [added]\n      package: [\"pkg:npm/@acme/*\"]\n    decision: deny\n",
-    );
-    let raw = judge(&raw_at, &old, &new)?;
-    assert!(change_units(&raw).iter().all(|unit| unit.used_default));
+    ))?;
+    assert!(raw_at.to_string().contains("%40"), "{raw_at}");
 
     let only_all =
         rule("    when:\n      change: [added]\n      package: [\"**\"]\n    decision: warn\n");
@@ -563,6 +695,57 @@ fn package_patterns_use_the_canonical_purl() -> Result<(), Box<dyn std::error::E
         })
         .ok_or("name")?;
     assert!(name_unit.used_default);
+    Ok(())
+}
+
+#[test]
+fn package_patterns_do_not_skip_qualifiers() -> Result<(), Box<dyn std::error::Error>> {
+    let old = empty_document();
+    let mut new = empty_document();
+    let mut qualifiers = BTreeMap::new();
+    qualifiers.insert(
+        "repository_url".to_owned(),
+        "https://evil.example".to_owned(),
+    );
+    let key = ComponentKey::Purl {
+        ty: "npm".to_owned(),
+        namespace: Some("@acme".to_owned()),
+        name: "tool".to_owned(),
+        qualifiers,
+        subpath: None,
+    };
+    put(&mut new, key, "1.0.0", DependencyRole::Direct);
+
+    let broad = rule(
+        "    unless: [\"pkg:npm/%40acme/*\"]\n    when:\n      change: [added]\n    decision: deny\n",
+    );
+    let kept = judge(&broad, &old, &new)?;
+    assert_eq!(
+        unit_kind(&kept, ChangeKind::Added)?.configured,
+        Decision::Deny
+    );
+
+    let named = rule(
+        "    unless: [\"pkg:npm/%40acme/*?repository_url=https:%2F%2Fevil.example\"]\n    when:\n      change: [added]\n    decision: deny\n",
+    );
+    let dropped = judge(&named, &old, &new)?;
+    assert_eq!(
+        unit_kind(&dropped, ChangeKind::Added)?.configured,
+        Decision::Allow
+    );
+
+    let everything =
+        rule("    unless: [\"**\"]\n    when:\n      change: [added]\n    decision: deny\n");
+    let skipped = judge(&everything, &old, &new)?;
+    assert_eq!(
+        unit_kind(&skipped, ChangeKind::Added)?.configured,
+        Decision::Allow
+    );
+
+    let raw_at = policy_err(&rule(
+        "    when:\n      change: [added]\n      package: [\"pkg:npm/@acme/*\"]\n    decision: deny\n",
+    ))?;
+    assert!(raw_at.to_string().contains("%40"), "{raw_at}");
     Ok(())
 }
 
@@ -810,18 +993,17 @@ fn one_hundred_thousand_changes_against_one_hundred_rules() -> Result<(), String
     let old = empty_document();
     let mut new = empty_document();
     for index in 0..100_000 {
-        put(
-            &mut new,
-            npm(&format!("pkg{index}")),
-            "1.0.0",
-            DependencyRole::Direct,
-        );
+        let key = npm(&format!("pkg{index}"));
+        put(&mut new, key.clone(), "1.0.0", DependencyRole::Direct);
+        attrs(&mut new, &key, "1.0.0")?
+            .licenses
+            .insert("MIT".to_owned());
     }
     let mut text = String::from("version: 1\nmode: enforce\ndefault: allow\nrules:\n");
     for index in 0..100 {
         let _ = write!(
             text,
-            "  - id: r{index:03}\n    when:\n      change: [added]\n      role: [direct]\n    decision: warn\n"
+            "  - id: r{index:03}\n    when:\n      change: [added]\n      role: [direct]\n      license: [MIT]\n    decision: warn\n"
         );
     }
     let policy = load(&text).map_err(|error| error.to_string())?;

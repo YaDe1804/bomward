@@ -14,7 +14,7 @@ Three files under `examples/policies/` are ready to copy:
 
 | File | What it does |
 | --- | --- |
-| `recommended.yaml` | `mode: warn`. Downgrades, hash contradictions, dropped hash algorithms, and a newly arrived GPL or AGPL license are `deny`, which this mode reports as `warn`. A new direct dependency is `warn`. |
+| `recommended.yaml` | `mode: warn`. Downgrades, hash contradictions, dropped hash algorithms, and a new or newly arrived GPL or AGPL license are `deny`, which this mode reports as `warn`. A new direct dependency, a dependency that becomes required, and a license string that is not SPDX are `warn`. |
 | `strict.yaml` | The same rules with `mode: enforce` and `default: warn`. A missing graph and a duplicate key in the new SBOM are `deny`. |
 | `licenses.yaml` | License rules only, including an `unless` exception. The exception is written with `%40`, which is the canonical spelling of an npm scope. |
 
@@ -78,6 +78,7 @@ version before the update and the version after it.
 | `direction` | `upgrade`, `downgrade`, `unknown` | `change` lists `version-changed` |
 | `role` | `direct`, `transitive`, `unknown` | change rule |
 | `license` | SPDX license ids | change rule |
+| `license_status` | `unrecognized` | `change` lists `added`, `license-changed`, or `version-changed` |
 | `missing` | `license`, `hash`, `supplier` | change rule |
 | `coverage` | `algorithm-added`, `algorithm-removed`, `all-dropped` | `change` lists `hash-coverage-changed` |
 | `scope` | `required`, `optional`, `excluded` | change rule |
@@ -92,18 +93,50 @@ version before the update and the version after it.
 `unknown_role: transitive` matches `unknown` and `transitive`. A generated
 SBOM with no graph would otherwise walk past every direct-dependency rule.
 
+## How license strings are matched
+
 `license` matches an SPDX id inside a license string, not a substring.
 Comparison ignores ASCII case. `GPL-3.0-only` does not match
 `LGPL-3.0-only`. `GPL-3.0` does not match `GPL-3.0-or-later`. `OR`, `AND`,
 and `WITH` still match the id: `MIT OR GPL-3.0-only` matches `GPL-3.0-only`,
 and `GPL-2.0-only WITH Classpath-exception-2.0` matches `GPL-2.0-only`.
-A string that is not a valid SPDX expression matches nothing.
+
+A string is parsed as an SPDX expression. When that parse fails, the
+string is split into tokens on the same characters an expression uses
+(ASCII letters and digits, `-`, and `.`). Each token that is an SPDX id
+counts. The rest is ignored, so these all contain `GPL-3.0-only`:
+
+- `GPL-3.0-only AND MyCustomLicense`
+- `GPL-3.0-only AND`
+- `GPL-3.0-only/MIT`
+- `GPL-3.0-only, see LICENSE`
+
+`LGPL-3.0-only AND MyCustomLicense` does not. The id is the whole token.
+
+SPDX 2.3 allows a `+` immediately after any license id, with no space
+before it, meaning that version or any later version. The string contains
+the id itself, `{id}-or-later` when that identifier is on the list, and
+the deprecated `{id}+` identifier when the list still has one. License
+list 3.29 embeds `+` only in `GPL-1.0+`, `GPL-2.0+`, `GPL-3.0+`,
+`LGPL-2.0+`, `LGPL-2.1+`, and `LGPL-3.0+`. `GPL-3.0+` therefore matches a
+rule for `GPL-3.0-or-later` and a rule for `GPL-3.0`. It does not match
+`GPL-3.0-only`. The same expansion is used when the expression parses
+(`CDDL-1.0+` contains `CDDL-1.0`) and when it does not (`GPL-3.0+`).
+
+`license_status: [unrecognized]` matches when a considered string is
+neither an SPDX id nor a valid expression. `GNU General Public License
+v3.0 only` is unrecognized. `GPL-3.0-only AND MyCustomLicense` is not,
+because the token scan finds `GPL-3.0-only`. The matcher applies to
+`added`, to `license-changed`, and to `version-changed` that carries the
+license flag. A version update that keeps the same license text does not
+match. `change` must list at least one of those three kinds. `any` is not
+enough.
 
 On a `license-changed` row, and on a `version-changed` row whose licenses
 differ, only the license strings that were added are scanned. A license
 that was only removed does not match. On every other row the licenses of
 the version under review are scanned. That version is the new one, and for
-`removed` the old one.
+`removed` the old one. Each of those strings is analyzed once per unit.
 
 `missing` is true when that version has no license, no hash, or no
 supplier. The list is OR: any one of the named gaps is enough.
@@ -126,16 +159,51 @@ percent-encoded:
 pkg:npm/%40acme/tool
 ```
 
-`pkg:npm/@acme/*` does not match that URL. Write `%40`.
+An unencoded `@` in the namespace or the name is an error. The message
+says to write `%40`. The same check rejects the other characters the
+canonical key percent-encodes in a namespace or name, and names the
+encoding to write instead:
+
+| Character | Write |
+| --- | --- |
+| space | `%20` |
+| `"` | `%22` |
+| `%` that is not a `%HH` escape | `%25` |
+| `<` `>` | `%3C` `%3E` |
+| `` ` `` | `%60` |
+| `{` `}` | `%7B` `%7D` |
+| `;` | `%3B` |
+| `=` | `%3D` |
+| `+` | `%2B` |
+| `@` | `%40` |
+| `\` | `%5C` |
+| `[` `]` | `%5B` `%5D` |
+| `^` | `%5E` |
+| `\|` | `%7C` |
+
+`/` separates segments. `?` starts qualifiers and `#` starts the subpath,
+so those two are not errors. A control character in the namespace or name
+is also an error.
 
 | Pattern | Matches |
 | --- | --- |
-| `*` | any run of characters other than `/` |
-| `**` | any run, including `/` |
+| `*` | any run of characters other than `/`, `?`, or `#` |
+| `**` | any run other than `?` or `#`, including `/` |
 | anything else | that character, literally |
 
+`*` and `**` never match across `?` or `#`. A key that has qualifiers or a
+subpath matches only a pattern that names them. Qualifiers are written in
+the same canonical, sorted form as the key, including percent-encoding.
+`pkg:npm/%40acme/*` does not match
+`pkg:npm/%40acme/tool?repository_url=https:%2F%2Fevil.example`.
+`pkg:npm/%40acme/*?repository_url=https:%2F%2Fevil.example` does.
+
+The exact pattern `**` still matches every key, including one with
+qualifiers or a subpath, and a component that has no package URL.
+`pkg:**` does not: the `**` stops at `?` and `#`.
+
 A pattern must start with `pkg:`, except the exact pattern `**`.
-`***` is rejected. No other character is special: `?` and `[` are literal.
+`***` is rejected.
 
 A component that has no package URL, only `group` and `name`, matches the
 exact pattern `**` and nothing else. `pkg:**` does not name it.
@@ -215,7 +283,7 @@ found. It is not truncated. The size is checked before the file is parsed.
 
 YAML aliases are rejected, including a nested alias bomb. Anchors that are
 never referenced are harmless. A repeated key is an error. Unknown fields
-are errors. The parser's error names a line and a column when it has them.
+are errors. The parser's error names a line and a column once when it has them.
 Checks that run after parsing name the rule id and the field. Text taken
 from the file is cut at 64 characters, and control characters are written
 as `\u{XXXX}`.

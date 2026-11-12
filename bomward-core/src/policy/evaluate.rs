@@ -17,12 +17,12 @@ use crate::diff::{
 use crate::model::{ComponentKey, DependencyRole, VersionAttributes, VersionId, Warning};
 use crate::purl::canonical_purl;
 
-use super::license::expression_contains;
+use super::license::analyze_license;
 use super::load::Policy;
 use super::pattern::Pattern;
 use super::schema::{
-    ChangeFilter, ChangeRule, CoverageKind, Decision, DocumentCondition, MissingAttr, Mode,
-    RoleMatch, Rule, RuleBody, ScopeMatch, UnknownRole,
+    ChangeFilter, ChangeRule, CoverageKind, Decision, DocumentCondition, LicenseStatus,
+    MissingAttr, Mode, RoleMatch, Rule, RuleBody, ScopeMatch, UnknownRole,
 };
 
 /// Overall result of a verdict.
@@ -205,8 +205,9 @@ fn judge_document(policy: &Policy, condition: DocumentCondition) -> Unit {
 }
 
 fn judge_change(policy: &Policy, change: &Change) -> Unit {
+    let licenses = license_view(change);
     let (configured, rules, used_default) = decide(policy, |rule| match &rule.body {
-        RuleBody::Change(body) => change_matches(body, change, policy.unknown_role()),
+        RuleBody::Change(body) => change_matches(body, change, policy.unknown_role(), &licenses),
         RuleBody::Document(_) => false,
     });
     finish(
@@ -269,7 +270,12 @@ fn fold(decisions: impl Iterator<Item = Decision>) -> Outcome {
     }
 }
 
-fn change_matches(rule: &ChangeRule, change: &Change, unknown_role: UnknownRole) -> bool {
+fn change_matches(
+    rule: &ChangeRule,
+    change: &Change,
+    unknown_role: UnknownRole,
+    licenses: &LicenseView,
+) -> bool {
     if !kind_matches(&rule.changes, change) {
         return false;
     }
@@ -286,8 +292,13 @@ fn change_matches(rule: &ChangeRule, change: &Change, unknown_role: UnknownRole)
     {
         return false;
     }
-    if let Some(licenses) = &rule.licenses
-        && !license_matches(licenses, change)
+    if let Some(wanted) = &rule.licenses
+        && !license_matches(wanted, licenses)
+    {
+        return false;
+    }
+    if let Some(status) = &rule.license_status
+        && !status_matches(status, licenses, change)
     {
         return false;
     }
@@ -379,11 +390,53 @@ fn role_matches(
     }
 }
 
-fn license_matches(wanted: &[&str], change: &Change) -> bool {
-    let texts = considered_licenses(change);
-    wanted
-        .iter()
-        .any(|id| texts.iter().any(|text| expression_contains(text, id)))
+struct LicenseView {
+    ids: BTreeSet<&'static str>,
+    unrecognized: bool,
+}
+
+fn license_view(change: &Change) -> LicenseView {
+    let mut ids = BTreeSet::new();
+    let mut unrecognized = false;
+    for text in considered_licenses(change) {
+        let facts = analyze_license(text);
+        if !facts.recognized {
+            unrecognized = true;
+        }
+        ids.extend(facts.ids);
+    }
+    LicenseView { ids, unrecognized }
+}
+
+fn license_matches(wanted: &[&str], licenses: &LicenseView) -> bool {
+    wanted.iter().any(|id| licenses.ids.contains(id))
+}
+
+fn status_matches(
+    wanted: &BTreeSet<LicenseStatus>,
+    licenses: &LicenseView,
+    change: &Change,
+) -> bool {
+    wanted.contains(&LicenseStatus::Unrecognized)
+        && licenses.unrecognized
+        && license_status_applies(change)
+}
+
+fn license_status_applies(change: &Change) -> bool {
+    match change.kind {
+        ChangeKind::Added | ChangeKind::LicenseChanged => true,
+        ChangeKind::VersionChanged => matches!(
+            &change.detail,
+            ChangeDetail::VersionChanged { flags, .. }
+                if flags.contains(&AttributeFlag::LicenseChanged)
+        ),
+        ChangeKind::Removed
+        | ChangeKind::SupplierChanged
+        | ChangeKind::HashChanged
+        | ChangeKind::HashCoverageChanged
+        | ChangeKind::ScopeChanged
+        | ChangeKind::RoleChanged => false,
+    }
 }
 
 fn considered_licenses(change: &Change) -> Vec<&str> {

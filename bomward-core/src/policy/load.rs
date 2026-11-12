@@ -20,8 +20,8 @@ use super::license::canonical_license;
 use super::limits::PolicyLimits;
 use super::pattern::{Pattern, PatternError};
 use super::schema::{
-    ChangeFilter, ChangeRule, CoverageKind, Decision, DocumentCondition, MissingAttr, Mode,
-    RoleMatch, Rule, RuleBody, ScopeMatch, UnknownRole,
+    ChangeFilter, ChangeRule, CoverageKind, Decision, DocumentCondition, LicenseStatus,
+    MissingAttr, Mode, RoleMatch, Rule, RuleBody, ScopeMatch, UnknownRole,
 };
 
 /// A policy that has already passed validation.
@@ -100,6 +100,8 @@ struct RawWhen {
     #[serde(default)]
     license: Option<Vec<String>>,
     #[serde(default)]
+    license_status: Option<Vec<String>>,
+    #[serde(default)]
     missing: Option<Vec<String>>,
     #[serde(default)]
     coverage: Option<Vec<String>>,
@@ -130,10 +132,19 @@ fn parser_config(limits: &PolicyLimits) -> ParserConfig {
 
 fn yaml_error(err: &noyalib::Error) -> PolicyError {
     let location = err.location();
+    let line = location.as_ref().map(noyalib::Location::line);
+    let column = location.as_ref().map(noyalib::Location::column);
+    let mut message = err.to_string();
+    if let (Some(line), Some(column)) = (line, column) {
+        let located = format!(" at line {line}, column {column}");
+        if let Some(at) = message.find(&located) {
+            message.replace_range(at..at.saturating_add(located.len()), "");
+        }
+    }
     PolicyError::Invalid {
-        line: location.as_ref().map(noyalib::Location::line),
-        column: location.as_ref().map(noyalib::Location::column),
-        message: sanitize(&err.to_string()),
+        line,
+        column,
+        message: sanitize(&message),
     }
 }
 
@@ -203,6 +214,7 @@ fn compile_body(raw: &RawRule, limits: &PolicyLimits) -> Result<RuleBody, Policy
         || when.direction.is_some()
         || when.role.is_some()
         || when.license.is_some()
+        || when.license_status.is_some()
         || when.missing.is_some()
         || when.coverage.is_some()
         || when.scope.is_some()
@@ -251,6 +263,20 @@ fn compile_change(raw: &RawRule, limits: &PolicyLimits) -> Result<ChangeRule, Po
             "direction requires change to list version-changed",
         ));
     }
+    let license_status = optional_mapped(
+        &raw.id,
+        "license_status",
+        when.license_status.as_ref(),
+        limits,
+        parse_license_status,
+    )?;
+    if license_status.is_some() && !license_status_legal(&changes) {
+        return Err(rule_message(
+            &raw.id,
+            "license_status",
+            "license_status requires change to list added, license-changed, or version-changed",
+        ));
+    }
     let coverage = optional_mapped(
         &raw.id,
         "coverage",
@@ -270,6 +296,7 @@ fn compile_change(raw: &RawRule, limits: &PolicyLimits) -> Result<ChangeRule, Po
         roles: optional_mapped(&raw.id, "role", when.role.as_ref(), limits, parse_role)?,
         directions,
         licenses: compile_licenses(&raw.id, when.license.as_ref(), limits)?,
+        license_status,
         missing: optional_mapped(
             &raw.id,
             "missing",
@@ -283,6 +310,12 @@ fn compile_change(raw: &RawRule, limits: &PolicyLimits) -> Result<ChangeRule, Po
         unless: compile_patterns(&raw.id, "unless", raw.unless.as_ref(), limits)?
             .unwrap_or_default(),
     })
+}
+
+fn license_status_legal(filter: &ChangeFilter) -> bool {
+    filter_contains(filter, ChangeKind::Added)
+        || filter_contains(filter, ChangeKind::LicenseChanged)
+        || filter_contains(filter, ChangeKind::VersionChanged)
 }
 
 fn filter_contains(filter: &ChangeFilter, kind: ChangeKind) -> bool {
@@ -358,16 +391,29 @@ fn compile_patterns(
         }
         match Pattern::compile(value) {
             Ok(pattern) => patterns.push(pattern),
-            Err(PatternError::Prefix) => {
-                return Err(rule_message(
-                    rule,
-                    field,
-                    &format!("pattern {} must start with pkg: or be **", sanitize(value)),
-                ));
+            Err(error) => {
+                return Err(rule_message(rule, field, &pattern_message(value, error)));
             }
         }
     }
     Ok(Some(patterns))
+}
+
+fn pattern_message(value: &str, error: PatternError) -> String {
+    match error {
+        PatternError::Prefix => {
+            format!("pattern {} must start with pkg: or be **", sanitize(value))
+        }
+        PatternError::Unencoded { found, write } => {
+            format!(
+                "pattern contains unencoded '{}' in the namespace or name; write {write}",
+                sanitize(&found.to_string())
+            )
+        }
+        PatternError::Control => {
+            "pattern contains a control character in the namespace or name".to_owned()
+        }
+    }
 }
 
 fn compile_document(
@@ -447,6 +493,13 @@ fn parse_direction(value: &str) -> Option<Direction> {
         "upgrade" => Direction::Upgrade,
         "downgrade" => Direction::Downgrade,
         "unknown" => Direction::Unknown,
+        _ => return None,
+    })
+}
+
+fn parse_license_status(value: &str) -> Option<LicenseStatus> {
+    Some(match value {
+        "unrecognized" => LicenseStatus::Unrecognized,
         _ => return None,
     })
 }

@@ -33,6 +33,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- License matching keeps SPDX ids from a string that is not a valid
+  expression, and `GPL-3.0+` matches both `GPL-3.0-or-later` and
+  `GPL-3.0`. `license_status: [unrecognized]` matches free text.
+  `*` and `**` no longer cross `?` or `#`. An unencoded `@` in a
+  package pattern's namespace or name is an error. See
+  [docs/POLICY.md](docs/POLICY.md).
 - The graph position is a role (`root`, `direct`, `transitive`,
   `unknown`). A missing graph warns `role-unknown`. `scope` is only the
   CycloneDX field. The policy sketch uses `role:`.
