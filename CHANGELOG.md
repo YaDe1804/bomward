@@ -37,6 +37,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Hash content is stored as lowercase hex. The algorithm name keeps its
   case, so `ABCD` and `abcd` are one hash.
 - A document with no components warns `no-components`.
+- ADRs 0011 (change model) and 0012 (version direction).
+- `diff` compares two documents into a typed diff. Kinds are `added`,
+  `removed`, `version-changed`, `license-changed`, `supplier-changed`,
+  `hash-changed`, `hash-coverage-changed`, `scope-changed`, and
+  `role-changed`. The root component is a separate entry.
+- Version direction uses `semver` 1.0.28 for `npm` and `cargo`. Anything
+  else is `unknown`.
 - A dependency cycle is stored. `--max-depth` limits nested `components`,
   not JSON container depth and not the length of a dependency chain.
   JSON containers are capped at 127, and that error does not name the

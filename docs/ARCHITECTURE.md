@@ -1,8 +1,8 @@
 # Architecture
 
 bomward is a Cargo workspace with two crates. [ADR 0003](adr/0003-rust-workspace.md)
-records that split. Ingest and the model are implemented. Diff, policy, and
-report are still seams.
+records that split. Ingest, the model, and the diff are implemented.
+Policy and report are still seams.
 
 ## Crates
 
@@ -19,14 +19,14 @@ unchecked indexing, `todo!`, and `dbg!` in every target.
 
 ## Modules
 
-`bomward-core` exposes five modules. Ingest and the model have types and
-functions. The other three are still empty apart from their docs.
+`bomward-core` exposes five modules. Ingest, the model, and the diff have
+types and functions. Policy and report are still empty apart from their docs.
 
 | Module | Responsibility | Work package |
 | --- | --- | --- |
 | `ingest` | CycloneDX JSON → model, enforcing the input limits. | AP1, done |
 | `model` | Normalized components and identities. | AP1, done |
-| `diff` | Added, removed, and changed components. | AP2 |
+| `diff` | Two documents → a typed, deterministic diff. | AP2, done |
 | `policy` | YAML rules → a verdict with reasons. | AP3 |
 | `report` | Terminal, Markdown, and JSON rendering. | AP4 |
 
@@ -45,7 +45,7 @@ files. `ingest` is the only module that interprets CycloneDX JSON.
 `bomward-core` returns `bomward_core::Error`, a `thiserror` enum. Library
 functions do not panic and do not exit the process.
 
-`NotImplemented` remains for diff, policy, and report. Ingest adds I/O,
+`NotImplemented` remains for policy and report. Ingest adds I/O,
 invalid document, unsupported `specVersion`, limit variants, and a
 usage error when `--max-depth` is above 63. The limit variant carries
 the kind (file size, component count, component nesting, or JSON
@@ -74,6 +74,16 @@ It does not open the paths. The contract those flags will have is in
 nesting are checked while reading. [ADR 0009](adr/0009-purl-normalization.md)
 parses package URLs with `packageurl` 0.7.1. Public entry points are
 `read_path` and `read_bytes`. The CLI does not call them yet.
+
+## Diff
+
+[ADR 0011](adr/0011-change-model.md) names the nine change kinds, the
+one-to-one version pairing, and the separate root entry.
+[ADR 0012](adr/0012-version-ordering.md) gives `version-changed` a
+direction. `npm` and `cargo` use `semver` 1.0.28 precedence. Every other
+type, a failed parse, and equal precedence are `unknown`. `diff` takes
+two `&Document` values, cannot fail, and does not read files. The CLI
+does not call it yet.
 
 ## Supply chain of the tool
 

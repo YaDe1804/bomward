@@ -1,8 +1,8 @@
 # bomward specification
 
 Status of this document: contract for v0.1. The library can read a CycloneDX
-JSON document into the model. The CLI parses `diff` and still exits with
-code 2. See [ARCHITECTURE.md](ARCHITECTURE.md).
+JSON document into the model and diff two models. The CLI parses `diff`
+and still exits with code 2. See [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Purpose
 
@@ -208,5 +208,6 @@ The parser is the owned model in [ADR 0008](adr/0008-cyclonedx-parser.md).
 Package URL parsing is [ADR 0009](adr/0009-purl-normalization.md). The field
 mapping is [ADR 0010](adr/0010-document-mapping.md). The change model is
 [ADR 0011](adr/0011-change-model.md). Version direction is
-[ADR 0012](adr/0012-version-ordering.md). Policy and the report are later
-work packages. The CLI does not call ingest yet.
+[ADR 0012](adr/0012-version-ordering.md). The comparison is
+`bomward_core::diff::diff`. Policy and the report are later work
+packages. The CLI does not call ingest or the diff yet.
