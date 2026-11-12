@@ -999,3 +999,67 @@ fn one_hundred_thousand_components_are_read() -> Result<(), String> {
     }
     Ok(())
 }
+
+#[test]
+fn hash_algorithm_names_use_the_cyclonedx_spelling() -> Result<(), String> {
+    let document = read_default(
+        br#"{"bomFormat":"CycloneDX","specVersion":"1.6","components":[{"name":"left","version":"1","hashes":[{"alg":"sha-256","content":"ABCDEF"},{"alg":"blake3","content":"abcd"},{"alg":"streebog-256","content":"abcd"}]}]}"#,
+    )
+    .map_err(|error| error.to_string())?;
+    let hashes = document
+        .components
+        .values()
+        .next()
+        .and_then(|component| component.versions.values().next())
+        .map(|stored| stored.attributes.hashes.clone())
+        .ok_or("missing hashes")?;
+    let names: Vec<&str> = hashes.iter().map(|hash| hash.alg.as_str()).collect();
+    if names != ["BLAKE3", "SHA-256", "Streebog-256"] {
+        return Err(format!("{names:?}"));
+    }
+    let sha = hashes
+        .iter()
+        .find(|hash| hash.alg == "SHA-256")
+        .ok_or("missing SHA-256")?;
+    if sha.content != "abcdef" {
+        return Err(sha.content.clone());
+    }
+    if document
+        .warnings
+        .iter()
+        .any(|warning| warning.kind == WarningKind::UnknownHashAlgorithm)
+    {
+        return Err(format!("{:?}", document.warnings));
+    }
+    Ok(())
+}
+
+#[test]
+fn an_unknown_hash_algorithm_is_kept_and_warned() -> Result<(), String> {
+    let document = read_default(
+        b"{\"bomFormat\":\"CycloneDX\",\"specVersion\":\"1.6\",\"components\":[{\"name\":\"left\",\"version\":\"1\",\"hashes\":[{\"alg\":\"not-a-hash\\u001b[31m\",\"content\":\"abcd\"}]}]}",
+    )
+    .map_err(|error| error.to_string())?;
+    let alg = document
+        .components
+        .values()
+        .next()
+        .and_then(|component| component.versions.values().next())
+        .and_then(|stored| stored.attributes.hashes.iter().next())
+        .map(|hash| hash.alg.clone())
+        .ok_or("missing hash")?;
+    if alg != "not-a-hash\u{1b}[31m" {
+        return Err(format!("{alg:?}"));
+    }
+    let warning = document
+        .warnings
+        .iter()
+        .find(|warning| warning.kind == WarningKind::UnknownHashAlgorithm)
+        .ok_or("missing unknown-hash-algorithm")?;
+    if warning.kind.message() != "unknown hash algorithm"
+        || warning.key.as_ref().map(key_name) != Some("left")
+    {
+        return Err(format!("{:?}", document.warnings));
+    }
+    Ok(())
+}

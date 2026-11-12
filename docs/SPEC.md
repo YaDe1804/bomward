@@ -52,7 +52,9 @@ reported as `removed` plus `added`.
 
 License, hash, and supplier changes apply to a version that is in both
 sets. Hash content is compared as lowercase hex, so letter case is not a
-hash change. The algorithm name keeps its case. An invalid `purl` does
+hash change. The algorithm name is the CycloneDX spelling, so `SHA-256`
+and `sha-256` are one algorithm. A name outside that enumeration is
+kept and warns `unknown-hash-algorithm`. An invalid `purl` does
 not reject the file. The key falls back to `group` plus `name`, and the
 report counts and lists a warning. When a component `version` and its
 purl version differ, the purl version is stored and the document warns
@@ -64,15 +66,17 @@ policy sees is the one in the new document, and for `removed` the one
 in the old document. A version whose role is `root` is not a dependency
 change. The graph node is one key together with one version. Two
 versions of one package can have two roles.
-[ADR 0010](adr/0010-document-mapping.md) defines the four roles. A document
-with no `metadata.component`, or with no `dependencies` field, marks every
-version unknown and counts one warning, `role-unknown`. When the graph
-is present, a version that stays unknown also counts one warning,
-`unreachable`, once per component key. A document with no components
-warns `no-components`. A document that only names `metadata.component`
-is not empty. `scope` in a
-component is only the CycloneDX field. `bom-ref` is never compared
-across the two documents.
+[ADR 0010](adr/0010-document-mapping.md) defines the four roles.
+`metadata.component` is `root` even when `dependencies` is absent. A
+document with no `metadata.component`, or with no `dependencies` field,
+counts one warning, `role-unknown`. When the graph is present, a version
+that stays unknown also counts one warning, `unreachable`, once per
+component key. Roles are compared only when neither document has
+`role-unknown`. The diff records that as `roles_comparable`. A document
+with no components warns `no-components`. A document that only names
+`metadata.component` is not empty. `scope` in a component is only the
+CycloneDX field. A missing scope is stored as absent and compares as
+`required`. `bom-ref` is never compared across the two documents.
 
 ## Non-goals for v0.1
 

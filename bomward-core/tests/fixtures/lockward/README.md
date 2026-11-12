@@ -15,6 +15,11 @@ The binary was `lockward-cli` 0.2.0, built from `../lockward` with
 coverage and exits 1. The SBOM is still written. `--scanned-at` is fixed
 so the timestamp does not depend on the clock.
 
+`lockward-old-format.cdx.json` was not produced by Lockward. It was
+derived by hand from `lockward-old.cdx.json` by deleting the
+`dependencies` array and every `bom-ref`. That is the shape an older
+Lockward wrote: the same components, with no graph and no `bom-ref`.
+
 What the pair is built to show, old then new:
 
 | Package | Old | New | Intended diff |

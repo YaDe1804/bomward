@@ -44,7 +44,10 @@ Identifiers are kebab-case. They sort in the order listed.
 `file_name`, `vers`) are not change kinds in v0.1.
 
 Hash content is compared with ASCII case folding, so `ABCD` and `abcd`
-are the same content. The algorithm name is compared exactly. When one
+are the same content. The algorithm name is compared exactly, after
+ingest has stored the CycloneDX spelling ([ADR 0010](0010-document-mapping.md)).
+`SHA-256` and `sha-256` are therefore one algorithm: different content
+is `hash-changed`, and the same content is not a change. When one
 version carries two contents for one algorithm, the contents are a set:
 the sets differ, or they do not. A shared algorithm whose content sets
 differ is `hash-changed`, even if one side has an extra content for that
@@ -57,6 +60,17 @@ the old side had some.
 
 License, supplier, and scope details use the same added/removed split.
 A set that is equal produces no entry.
+
+CycloneDX defines `scope` as `required`, `optional`, or `excluded`. The
+JSON schema for 1.4, 1.5, 1.6, and 1.7 says, on the component `scope`
+field: "If scope is not specified, 'required' scope SHOULD be assumed
+by the consumer of the BOM." The field's default is `required`. The
+model still stores an absent field as an empty set, so it shows what
+the document contained. The diff is the consumer that
+assumes the default: an empty scope set compares as `required`.
+`required` against a missing scope is not `scope-changed`. `excluded`
+against a missing scope is `scope-changed`, and the detail names
+`required` for the side that omitted the field.
 
 ### Pairing a version change
 
@@ -90,6 +104,18 @@ comparison would have produced an entry. AP3 can write a rule for
 double-counting the summary.
 
 ### Roles
+
+Roles are compared only when both documents have a graph. A document
+has a graph when it has a root and a `dependencies` field. Ingest
+records the opposite with one `role-unknown` warning
+([ADR 0010](0010-document-mapping.md)): no `metadata.component`, or no
+`dependencies` field. An empty `dependencies` array is a graph.
+
+The diff sets `roles_comparable` from that fact. When it is false, the
+diff emits no `role-changed` and sets no role flag on `version-changed`.
+`old_role` and `new_role` are still copied, so a report can show them.
+When both documents have a graph, a change from or to `unknown` on one
+component is `role-changed`.
 
 Every dependency change carries `old_role` and `new_role`. Either may
 be absent. `added` has no old role. `removed` has no new role. The
@@ -190,6 +216,12 @@ project look like a new dependency.
   twice, and a rule on `license-changed` would match updates and
   in-place edits without a way to tell them apart. The flag on the
   update is that distinction.
+- Store a missing `scope` as `required` during ingest. Rejected: the
+  model would hide that the field was absent. The diff applies the
+  default the spec assigns to the consumer.
+- Compare roles when one document has no graph. Rejected: every
+  component would change from or to `unknown`, which the file did not
+  state. `roles_comparable` tells the policy to skip that comparison.
 - Treat a lost purl as the same component via `group` and `name`.
   Rejected: [ADR 0005](0005-component-identity.md) made the purl the
   key on purpose. A heuristic repair would undo that for the one case

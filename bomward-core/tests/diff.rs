@@ -1078,6 +1078,59 @@ fn the_lockward_pair_matches_the_intended_changes() -> Result<(), String> {
     Ok(())
 }
 
+#[test]
+fn an_old_lockward_sbom_without_a_graph_skips_roles() -> Result<(), String> {
+    let limits = Limits::defaults();
+    let old = read_bytes(include_bytes!("fixtures/lockward-old.cdx.json"), &limits)
+        .map_err(|error| error.to_string())?;
+    let legacy = read_bytes(
+        include_bytes!("fixtures/lockward-old-format.cdx.json"),
+        &limits,
+    )
+    .map_err(|error| error.to_string())?;
+    let new = read_bytes(include_bytes!("fixtures/lockward-new.cdx.json"), &limits)
+        .map_err(|error| error.to_string())?;
+    let full = diff(&old, &new);
+    let result = diff(&legacy, &new);
+    if result.roles_comparable {
+        return Err("roles were comparable".to_owned());
+    }
+    if result
+        .changes
+        .iter()
+        .any(|change| change.kind == ChangeKind::RoleChanged)
+    {
+        return Err("role-changed".to_owned());
+    }
+    let kept = [
+        ChangeKind::Added,
+        ChangeKind::Removed,
+        ChangeKind::VersionChanged,
+        ChangeKind::LicenseChanged,
+        ChangeKind::ScopeChanged,
+    ];
+    let expect: Vec<_> = full
+        .changes
+        .iter()
+        .filter(|change| kept.contains(&change.kind))
+        .map(|change| (change.kind, change.key.clone(), change.version.clone()))
+        .collect();
+    let actual: Vec<_> = result
+        .changes
+        .iter()
+        .filter(|change| kept.contains(&change.kind))
+        .map(|change| (change.kind, change.key.clone(), change.version.clone()))
+        .collect();
+    if actual != expect {
+        return Err(format!(
+            "legacy {} entries, golden pair {} entries",
+            actual.len(),
+            expect.len()
+        ));
+    }
+    Ok(())
+}
+
 fn expect_direction_named(diff: &Diff, name: &str, direction: Direction) -> Result<(), String> {
     let change = named_kind(diff, name, ChangeKind::VersionChanged)?;
     let ChangeDetail::VersionChanged {
@@ -1180,6 +1233,202 @@ fn summary_counts_removed_under_the_old_role() -> Result<(), String> {
         .ok_or("missing transitive")?;
     if direct.counts.added != 1 || transitive.counts.removed != 1 {
         return Err(format!("{:?}", result.summary.by_role));
+    }
+    Ok(())
+}
+
+fn read_doc(bytes: &[u8]) -> Result<Document, String> {
+    read_bytes(bytes, &Limits::defaults()).map_err(|error| error.to_string())
+}
+
+fn hash_bom(alg: &str, content: &str) -> String {
+    format!(
+        r#"{{"bomFormat":"CycloneDX","specVersion":"1.6","components":[{{"name":"left","version":"1","hashes":[{{"alg":"{alg}","content":"{content}"}}]}}]}}"#
+    )
+}
+
+fn change_kinds(result: &Diff) -> Vec<ChangeKind> {
+    result.changes.iter().map(|change| change.kind).collect()
+}
+
+#[test]
+fn hash_spelling_with_different_content_is_hash_changed() -> Result<(), String> {
+    let old = read_doc(hash_bom("SHA-256", "abcdef").as_bytes())?;
+    let new = read_doc(hash_bom("sha-256", "ffffff").as_bytes())?;
+    let kinds = change_kinds(&diff(&old, &new));
+    if kinds != [ChangeKind::HashChanged] {
+        return Err(format!("{kinds:?}"));
+    }
+    Ok(())
+}
+
+#[test]
+fn hash_spelling_with_the_same_content_is_not_a_change() -> Result<(), String> {
+    let old = read_doc(hash_bom("SHA-256", "abcdef").as_bytes())?;
+    let new = read_doc(hash_bom("sha-256", "abcdef").as_bytes())?;
+    let result = diff(&old, &new);
+    if !result.is_empty() {
+        return Err(format!("{:?}", change_kinds(&result)));
+    }
+    Ok(())
+}
+
+fn scoped_bom(scope: Option<&str>) -> String {
+    let scope = match scope {
+        Some(value) => format!(r#","scope":"{value}""#),
+        None => String::new(),
+    };
+    format!(
+        r#"{{"bomFormat":"CycloneDX","specVersion":"1.6","components":[{{"name":"left","version":"1"{scope}}}]}}"#
+    )
+}
+
+fn scope_change(old_scope: Option<&str>, new_scope: Option<&str>) -> Result<Diff, String> {
+    let old = read_doc(scoped_bom(old_scope).as_bytes())?;
+    let new = read_doc(scoped_bom(new_scope).as_bytes())?;
+    Ok(diff(&old, &new))
+}
+
+fn set_detail(result: &Diff) -> Result<(BTreeSet<String>, BTreeSet<String>), String> {
+    match result.changes.first().map(|change| &change.detail) {
+        Some(ChangeDetail::SetChanged { added, removed }) => Ok((added.clone(), removed.clone())),
+        _ => Err(format!("{:?}", change_kinds(result))),
+    }
+}
+
+#[test]
+fn a_missing_scope_compares_as_required() -> Result<(), String> {
+    let missing = read_doc(scoped_bom(None).as_bytes())?;
+    let stored = missing
+        .components
+        .values()
+        .next()
+        .and_then(|component| component.versions.values().next())
+        .map(|stored| stored.attributes.scopes.clone())
+        .ok_or("missing component")?;
+    if !stored.is_empty() {
+        return Err(format!("model stored {stored:?}"));
+    }
+    let same = scope_change(None, Some("required"))?;
+    if !same.is_empty() {
+        return Err(format!("{:?}", change_kinds(&same)));
+    }
+    let dropped = scope_change(None, Some("excluded"))?;
+    let (added, removed) = set_detail(&dropped)?;
+    if added != BTreeSet::from(["excluded".to_owned()])
+        || removed != BTreeSet::from(["required".to_owned()])
+    {
+        return Err(format!("added {added:?} removed {removed:?}"));
+    }
+    let gained = scope_change(Some("excluded"), None)?;
+    let (added, removed) = set_detail(&gained)?;
+    if added != BTreeSet::from(["required".to_owned()])
+        || removed != BTreeSet::from(["excluded".to_owned()])
+    {
+        return Err(format!("added {added:?} removed {removed:?}"));
+    }
+    Ok(())
+}
+
+fn project_bom(dependencies: bool) -> String {
+    let dependencies = if dependencies {
+        r#","dependencies":[{"ref":"app","dependsOn":["left"]}]"#
+    } else {
+        ""
+    };
+    format!(
+        r#"{{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{{"component":{{"bom-ref":"app","name":"app","version":"1","purl":"pkg:generic/app@1"}}}},"components":[{{"bom-ref":"left","name":"left","version":"1","purl":"pkg:npm/left@1.0.0"}}]{dependencies}}}"#
+    )
+}
+
+#[test]
+fn a_document_without_dependencies_does_not_drop_the_root() -> Result<(), String> {
+    let old = read_doc(project_bom(false).as_bytes())?;
+    let new = read_doc(project_bom(true).as_bytes())?;
+    let root = old.components.values().any(|component| {
+        component
+            .versions
+            .values()
+            .any(|stored| stored.role == DependencyRole::Root)
+    });
+    if !root {
+        return Err("metadata.component is not root".to_owned());
+    }
+    let result = diff(&old, &new);
+    if change_kinds(&result)
+        .iter()
+        .any(|kind| matches!(kind, ChangeKind::Added | ChangeKind::Removed))
+    {
+        return Err(format!("{:?}", change_kinds(&result)));
+    }
+    if result.root.is_some() {
+        return Err("root entry".to_owned());
+    }
+    Ok(())
+}
+
+#[test]
+fn roles_are_compared_only_when_both_documents_have_a_graph() -> Result<(), String> {
+    let missing = read_doc(project_bom(false).as_bytes())?;
+    let linked = read_doc(project_bom(true).as_bytes())?;
+    let one_sided = diff(&missing, &linked);
+    if one_sided.roles_comparable {
+        return Err("roles were comparable".to_owned());
+    }
+    if one_sided
+        .changes
+        .iter()
+        .any(|change| change.kind == ChangeKind::RoleChanged)
+    {
+        return Err("role-changed without a graph".to_owned());
+    }
+    let unlinked = read_doc(
+        br#"{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"bom-ref":"app","name":"app","version":"1","purl":"pkg:generic/app@1"}},"components":[{"bom-ref":"left","name":"left","version":"1","purl":"pkg:npm/left@1.0.0"}],"dependencies":[]}"#,
+    )?;
+    let both = diff(&unlinked, &linked);
+    if !both.roles_comparable {
+        return Err("two graphs were not comparable".to_owned());
+    }
+    let roles: Vec<ChangeKind> = both
+        .changes
+        .iter()
+        .map(|change| change.kind)
+        .filter(|kind| *kind == ChangeKind::RoleChanged)
+        .collect();
+    if roles != [ChangeKind::RoleChanged] {
+        return Err(format!("{roles:?}"));
+    }
+    Ok(())
+}
+
+#[test]
+fn a_version_change_omits_the_role_flag_when_roles_are_not_comparable() -> Result<(), String> {
+    let old = read_doc(
+        br#"{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"bom-ref":"app","name":"app","version":"1","purl":"pkg:generic/app@1"}},"components":[{"bom-ref":"left","name":"left","version":"1.0.0","purl":"pkg:npm/left@1.0.0"}]}"#,
+    )?;
+    let new = read_doc(
+        br#"{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"bom-ref":"app","name":"app","version":"1","purl":"pkg:generic/app@1"}},"components":[{"bom-ref":"left","name":"left","version":"1.1.0","purl":"pkg:npm/left@1.1.0"}],"dependencies":[{"ref":"app","dependsOn":["left"]}]}"#,
+    )?;
+    let result = diff(&old, &new);
+    let Some(ChangeDetail::VersionChanged { flags, .. }) =
+        result.changes.first().map(|change| &change.detail)
+    else {
+        return Err(format!("{:?}", change_kinds(&result)));
+    };
+    if flags.contains(&AttributeFlag::RoleChanged) || result.roles_comparable {
+        return Err(format!("comparable {}", result.roles_comparable));
+    }
+    let old_graph = read_doc(
+        br#"{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"bom-ref":"app","name":"app","version":"1","purl":"pkg:generic/app@1"}},"components":[{"bom-ref":"left","name":"left","version":"1.0.0","purl":"pkg:npm/left@1.0.0"}],"dependencies":[]}"#,
+    )?;
+    let flagged = diff(&old_graph, &new);
+    let Some(ChangeDetail::VersionChanged { flags, .. }) =
+        flagged.changes.first().map(|change| &change.detail)
+    else {
+        return Err(format!("{:?}", change_kinds(&flagged)));
+    };
+    if !flagged.roles_comparable || !flags.contains(&AttributeFlag::RoleChanged) {
+        return Err(format!("comparable {}", flagged.roles_comparable));
     }
     Ok(())
 }

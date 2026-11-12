@@ -308,6 +308,11 @@ pub enum WarningKind {
     /// A service BOM can be valid and still name nothing. The warning has
     /// no component key.
     NoComponents,
+    /// A hash algorithm is not in the `CycloneDX` enumeration. Id: `unknown-hash-algorithm`.
+    ///
+    /// The name is stored as written. The warning text does not repeat it.
+    /// One warning per component key.
+    UnknownHashAlgorithm,
 }
 
 impl WarningKind {
@@ -324,6 +329,7 @@ impl WarningKind {
             Self::DuplicateKey => "duplicate-key",
             Self::Unreachable => "unreachable",
             Self::NoComponents => "no-components",
+            Self::UnknownHashAlgorithm => "unknown-hash-algorithm",
         }
     }
 
@@ -340,6 +346,7 @@ impl WarningKind {
             Self::DuplicateKey => "json object contains a duplicate key",
             Self::Unreachable => "component is not reachable from the root",
             Self::NoComponents => "document contains no components",
+            Self::UnknownHashAlgorithm => "unknown hash algorithm",
         }
     }
 }

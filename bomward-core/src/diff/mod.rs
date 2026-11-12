@@ -44,6 +44,7 @@ use serde::Serialize;
 
 use crate::model::{
     ComponentKey, DependencyRole, Document, GraphNode, VersionAttributes, VersionId, Warning,
+    WarningKind,
 };
 
 /// Most nodes stored on `introduced_by`.
@@ -63,13 +64,15 @@ pub const PATH_FROM_ROOT_LIMIT: usize = 32;
 /// has no changes and a zero summary. Warnings are still copied.
 #[must_use]
 pub fn diff(old: &Document, new: &Document) -> Diff {
-    let changes = compare::changes(old, new);
+    let roles_comparable = has_graph(old) && has_graph(new);
+    let changes = compare::changes(old, new, roles_comparable);
     let summary = summarize(&changes);
     let root = root_change(old, new);
     Diff {
         changes,
         root,
         summary,
+        roles_comparable,
         warnings: WarningSides {
             old: old.warnings.clone(),
             new: new.warnings.clone(),
@@ -89,6 +92,13 @@ pub struct Diff {
     pub root: Option<RootChange>,
     /// Counts of [`Self::changes`]. The root entry is not counted.
     pub summary: Summary,
+    /// Whether both documents have a graph, so roles may be compared.
+    ///
+    /// A document has a graph when it has a root and a `dependencies`
+    /// field. Ingest records the opposite with [`crate::WarningKind::RoleUnknown`].
+    /// When this is false, the diff has no `role-changed` entry and no
+    /// role flag. `old_role` and `new_role` are still copied.
+    pub roles_comparable: bool,
     /// Warnings copied from each document.
     pub warnings: WarningSides,
 }
@@ -393,6 +403,13 @@ pub struct RoleCount {
     pub role: DependencyRole,
     /// Counts of changes that use this role.
     pub counts: ChangeCounts,
+}
+
+fn has_graph(document: &Document) -> bool {
+    document
+        .warnings
+        .iter()
+        .all(|warning| warning.kind != WarningKind::RoleUnknown)
 }
 
 fn summarize(changes: &[Change]) -> Summary {

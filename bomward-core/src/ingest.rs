@@ -21,8 +21,8 @@ use std::path::Path;
 use crate::error::{DocumentError, Error, LimitExceeded, LimitKind};
 use crate::limits::Limits;
 use crate::model::{
-    Component, ComponentKey, DependencyRole, Document, GraphNode, Version, VersionAttributes,
-    VersionId, Warning, WarningKind,
+    Component, ComponentKey, ContentHash, DependencyRole, Document, GraphNode, Version,
+    VersionAttributes, VersionId, Warning, WarningKind,
 };
 use crate::purl::{ParsedPurl, parse_purl};
 
@@ -513,6 +513,7 @@ struct ParsedComponent {
     bom_ref: Option<String>,
     invalid_purl: bool,
     version_mismatch: bool,
+    unknown_hash: bool,
 }
 
 struct Assembler {
@@ -577,6 +578,12 @@ impl Assembler {
             self.warnings.insert(Warning {
                 key: Some(parsed.key.clone()),
                 kind: WarningKind::VersionMismatch,
+            });
+        }
+        if parsed.unknown_hash {
+            self.warnings.insert(Warning {
+                key: Some(parsed.key.clone()),
+                kind: WarningKind::UnknownHashAlgorithm,
             });
         }
         let node = GraphNode {
@@ -665,6 +672,9 @@ impl Assembler {
             });
             return;
         };
+        // metadata.component is the root even when the document has no
+        // dependencies field. The other versions stay unknown.
+        set_role(&mut self.components, &root, DependencyRole::Root);
         if !dependencies_present {
             self.warnings.insert(Warning {
                 key: None,
@@ -672,7 +682,6 @@ impl Assembler {
             });
             return;
         }
-        set_role(&mut self.components, &root, DependencyRole::Root);
         let directs = self.dependencies.get(&root).cloned().unwrap_or_default();
         for target in &directs {
             set_role(&mut self.components, target, DependencyRole::Direct);
@@ -755,6 +764,7 @@ fn component_fields(
         decode::PurlField::Absent | decode::PurlField::NotString => None,
     };
     let invalid_purl = !matches!(purl, decode::PurlField::Absent) && parsed_purl.is_none();
+    let (hashes, unknown_hash) = canonical_hashes(hashes);
     let version_mismatch = parsed_purl.as_ref().is_some_and(|parsed| {
         match (parsed.version.as_deref(), version.as_deref()) {
             (Some(purl_version), Some(component_version)) => purl_version != component_version,
@@ -785,9 +795,57 @@ fn component_fields(
             bom_ref,
             invalid_purl,
             version_mismatch,
+            unknown_hash,
         },
         children,
     ))
+}
+
+/// `CycloneDX` `hash-alg` spelling for spec versions 1.4 through 1.7.
+///
+/// 1.4, 1.5, and 1.6 list the same twelve names. 1.7 adds the two
+/// Streebog names. A match ignores ASCII case. Anything else is kept.
+fn canonical_hash_algorithm(name: &str) -> Option<&'static str> {
+    const NAMES: &[&str] = &[
+        "MD5",
+        "SHA-1",
+        "SHA-256",
+        "SHA-384",
+        "SHA-512",
+        "SHA3-256",
+        "SHA3-384",
+        "SHA3-512",
+        "BLAKE2b-256",
+        "BLAKE2b-384",
+        "BLAKE2b-512",
+        "BLAKE3",
+        "Streebog-256",
+        "Streebog-512",
+    ];
+    NAMES
+        .iter()
+        .copied()
+        .find(|candidate| candidate.eq_ignore_ascii_case(name))
+}
+
+fn canonical_hashes(hashes: BTreeSet<ContentHash>) -> (BTreeSet<ContentHash>, bool) {
+    let mut unknown = false;
+    let hashes = hashes
+        .into_iter()
+        .map(|hash| {
+            let alg = if let Some(name) = canonical_hash_algorithm(&hash.alg) {
+                name.to_owned()
+            } else {
+                unknown = true;
+                hash.alg
+            };
+            ContentHash {
+                alg,
+                content: hash.content,
+            }
+        })
+        .collect();
+    (hashes, unknown)
 }
 
 fn name_key(name: Option<String>, group: Option<String>) -> Result<ComponentKey, Error> {

@@ -20,10 +20,23 @@ pub(super) fn root_snapshot(document: &Document) -> Option<RootSnapshot> {
     provenance::find_root(document)
 }
 
-pub(super) fn changes(old: &Document, new: &Document) -> Vec<Change> {
+struct Walk<'a> {
+    old_root: Option<&'a RootSnapshot>,
+    new_root: Option<&'a RootSnapshot>,
+    provenance: &'a Provenance,
+    roles_comparable: bool,
+}
+
+pub(super) fn changes(old: &Document, new: &Document, roles_comparable: bool) -> Vec<Change> {
     let old_root = root_snapshot(old);
     let new_root = root_snapshot(new);
     let provenance = Provenance::from_document(new, new_root.as_ref());
+    let walk = Walk {
+        old_root: old_root.as_ref(),
+        new_root: new_root.as_ref(),
+        provenance: &provenance,
+        roles_comparable,
+    };
     let mut changes = Vec::new();
     let mut old_keys = old.components.iter().peekable();
     let mut new_keys = new.components.iter().peekable();
@@ -57,15 +70,7 @@ pub(super) fn changes(old: &Document, new: &Document) -> Vec<Change> {
                     if let (Some((key, old_component)), Some((_, new_component))) =
                         (old_keys.next(), new_keys.next())
                     {
-                        compare_key(
-                            &mut changes,
-                            key,
-                            old_component,
-                            new_component,
-                            old_root.as_ref(),
-                            new_root.as_ref(),
-                            &provenance,
-                        );
+                        compare_key(&mut changes, key, old_component, new_component, &walk);
                     }
                 }
             },
@@ -105,13 +110,13 @@ fn compare_key(
     key: &ComponentKey,
     old: &Component,
     new: &Component,
-    old_root: Option<&RootSnapshot>,
-    new_root: Option<&RootSnapshot>,
-    provenance: &Provenance,
+    walk: &Walk<'_>,
 ) {
-    let old_versions = dependency_versions(key, old, old_root);
-    let new_versions = dependency_versions(key, new, new_root);
-    if let Some(change) = paired_version_change(key, &old_versions, &new_versions) {
+    let old_versions = dependency_versions(key, old, walk.old_root);
+    let new_versions = dependency_versions(key, new, walk.new_root);
+    if let Some(change) =
+        paired_version_change(key, &old_versions, &new_versions, walk.roles_comparable)
+    {
         changes.push(change);
         return;
     }
@@ -129,7 +134,7 @@ fn compare_key(
             }
             (None, Some(_)) => {
                 if let Some((version, stored)) = new_versions.next() {
-                    changes.push(added_change(key, version, stored, provenance));
+                    changes.push(added_change(key, version, stored, walk.provenance));
                 }
             }
             (Some(old_only), Some(new_only)) => match old_only.cmp(new_only) {
@@ -140,14 +145,21 @@ fn compare_key(
                 }
                 Ordering::Greater => {
                     if let Some((version, stored)) = new_versions.next() {
-                        changes.push(added_change(key, version, stored, provenance));
+                        changes.push(added_change(key, version, stored, walk.provenance));
                     }
                 }
                 Ordering::Equal => {
                     if let (Some((version, old_stored)), Some((_, new_stored))) =
                         (old_versions.next(), new_versions.next())
                     {
-                        push_attribute_changes(changes, key, version, old_stored, new_stored);
+                        push_attribute_changes(
+                            changes,
+                            key,
+                            version,
+                            old_stored,
+                            new_stored,
+                            walk.roles_comparable,
+                        );
                     }
                 }
             },
@@ -159,6 +171,7 @@ fn paired_version_change(
     key: &ComponentKey,
     old_versions: &[(&VersionId, &Version)],
     new_versions: &[(&VersionId, &Version)],
+    roles_comparable: bool,
 ) -> Option<Change> {
     if old_versions.len() != 1 || new_versions.len() != 1 {
         return None;
@@ -174,6 +187,7 @@ fn paired_version_change(
         old_version,
         new_id,
         new_version,
+        roles_comparable,
     ))
 }
 
@@ -240,6 +254,7 @@ fn version_change(
     old_version: &Version,
     new_id: &VersionId,
     new_version: &Version,
+    roles_comparable: bool,
 ) -> Change {
     Change {
         key: key.clone(),
@@ -253,7 +268,7 @@ fn version_change(
             direction: direction(key, old_id, new_id),
             old_attributes: Box::new(old_version.attributes.clone()),
             new_attributes: Box::new(new_version.attributes.clone()),
-            flags: flags_between(old_version, new_version),
+            flags: flags_between(old_version, new_version, roles_comparable),
         },
     }
 }
@@ -264,6 +279,7 @@ fn push_attribute_changes(
     version: &VersionId,
     old: &Version,
     new: &Version,
+    roles_comparable: bool,
 ) {
     let shared = Shared {
         key,
@@ -286,15 +302,29 @@ fn push_attribute_changes(
         &new.attributes.suppliers,
     );
     push_hashes(changes, &shared);
+    let old_scopes = scopes_for_compare(&old.attributes.scopes);
+    let new_scopes = scopes_for_compare(&new.attributes.scopes);
     push_set(
         changes,
         &shared,
         ChangeKind::ScopeChanged,
-        &old.attributes.scopes,
-        &new.attributes.scopes,
+        &old_scopes,
+        &new_scopes,
     );
-    if old.role != new.role {
+    if roles_comparable && old.role != new.role {
         changes.push(shared.change(ChangeKind::RoleChanged, ChangeDetail::RoleChanged));
+    }
+}
+
+/// `CycloneDX` says a missing `scope` means `required`.
+///
+/// The model keeps the empty set, so a report can still show that the
+/// field was absent. Only the comparison fills it in.
+fn scopes_for_compare(scopes: &BTreeSet<String>) -> BTreeSet<String> {
+    if scopes.is_empty() {
+        BTreeSet::from([String::from("required")])
+    } else {
+        scopes.clone()
     }
 }
 
@@ -356,7 +386,7 @@ impl Shared<'_> {
     }
 }
 
-fn flags_between(old: &Version, new: &Version) -> BTreeSet<AttributeFlag> {
+fn flags_between(old: &Version, new: &Version, roles_comparable: bool) -> BTreeSet<AttributeFlag> {
     let mut flags = BTreeSet::new();
     if old.attributes.licenses != new.attributes.licenses {
         flags.insert(AttributeFlag::LicenseChanged);
@@ -371,10 +401,10 @@ fn flags_between(old: &Version, new: &Version) -> BTreeSet<AttributeFlag> {
     if !hashes.added.is_empty() || !hashes.removed.is_empty() {
         flags.insert(AttributeFlag::HashCoverageChanged);
     }
-    if old.attributes.scopes != new.attributes.scopes {
+    if scopes_for_compare(&old.attributes.scopes) != scopes_for_compare(&new.attributes.scopes) {
         flags.insert(AttributeFlag::ScopeChanged);
     }
-    if old.role != new.role {
+    if roles_comparable && old.role != new.role {
         flags.insert(AttributeFlag::RoleChanged);
     }
     flags
