@@ -116,6 +116,37 @@ fn qualifier_keys_repeat(raw: &str) -> bool {
     false
 }
 
+/// Canonical purl text for a key, without a version.
+///
+/// A [`ComponentKey::Name`] has no purl and returns `None`. A purl the
+/// `packageurl` crate refuses also returns `None`; a package pattern then
+/// matches it only when the pattern is `**`.
+pub(crate) fn canonical_purl(key: &ComponentKey) -> Option<String> {
+    let ComponentKey::Purl {
+        ty,
+        namespace,
+        name,
+        qualifiers,
+        subpath,
+    } = key
+    else {
+        return None;
+    };
+    let mut built = PackageUrl::new(ty.as_str(), name.as_str()).ok()?;
+    if let Some(namespace) = namespace {
+        built.with_namespace(namespace.as_str()).ok()?;
+    }
+    for (qualifier, value) in qualifiers {
+        built
+            .add_qualifier(qualifier.as_str(), value.as_str())
+            .ok()?;
+    }
+    if let Some(subpath) = subpath {
+        built.with_subpath(subpath.as_str()).ok()?;
+    }
+    Some(built.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::{parse_purl, qualifier_keys_repeat};

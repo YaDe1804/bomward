@@ -10,10 +10,12 @@ publish.workspace = true
 description = "Library for the bomward SBOM review gate."
 
 [dependencies]
+noyalib = "=0.0.60"
 packageurl = "0.7.1"
 semver = "1.0.28"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = { version = "1.0.154", features = ["raw_value"] }
+spdx = "0.13.6"
 thiserror = "2.0.21"
 
 [lints]

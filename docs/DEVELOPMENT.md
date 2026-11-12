@@ -52,6 +52,8 @@ The foundation closure is:
 | `thiserror` | 2.0.21 | `bomward-core` | Typed library errors. |
 | `anyhow` | 1.0.104 | `bomward-cli` | CLI error reporting only. |
 | `clap` | 4.6.7 | `bomward-cli` | Command and flag parsing (`derive`). |
+| `noyalib` | 0.0.60 | `bomward-core` | Policy YAML. Exact pin `=0.0.60`. See ADR 0014. |
+| `spdx` | 0.13.6 | `bomward-core` | SPDX license ids inside policy expressions. Default features. |
 
 `bomward-cli` also depends on `bomward-core` by path. Versions are locked in
 `Cargo.lock`. Add a crate with `cargo add` and update this table in the same
