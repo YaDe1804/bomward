@@ -75,6 +75,18 @@ registry. Following that reference would run or fetch untrusted content.
 Mitigation: no network client, no shell, no execution of component
 artifacts. The tool reads the two documents and the policy file and stops.
 
+### Policy edited in the pull request
+
+The author of a pull request can change the policy file in the same
+change as the SBOM. A rule that the project relies on can be deleted or
+relaxed in that commit, and a review that reads the policy from the pull
+request head will judge the diff against the weakened file.
+
+Mitigation for the GitHub Action (a later work package): read the policy
+from the target branch, not from the pull request. The SBOM under review
+still comes from the change. This is a requirement on that action. The
+library does not fetch git refs. It reads the path the caller passes.
+
 ### Supply chain of bomward
 
 The review gate is itself a dependency of the user's CI.

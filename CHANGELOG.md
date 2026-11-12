@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Policy version 1: `bomward-core` reads a YAML policy, rejects unknown
+  fields, duplicate keys, and aliases, and evaluates a diff into a
+  verdict. `mode: warn` turns `deny` into `warn`. Exit code 1 is
+  `Verdict::exit_code` when the effective result is `deny`. The CLI
+  does not call this yet. See [docs/POLICY.md](docs/POLICY.md) and
+  ADRs 0013 and 0014. Example files live in `examples/policies/`.
 - Repository foundation: public docs, ADRs 0001–0007, and the Cargo workspace.
 - `bomward` parses `diff <OLD> <NEW>` with `--policy` and `--format`, then
   exits 2 with `not implemented yet`. It does not review SBOMs yet.

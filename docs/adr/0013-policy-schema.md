@@ -151,6 +151,11 @@ package the pattern did not mention.
 ## Consequences
 
 - [POLICY.md](../POLICY.md) is the page operators read.
+- Each diff change carries the attributes of the version under review
+  so a matcher can see scope, licenses, hashes, and suppliers. `removed`
+  carries the old version. Every other kind carries the new version.
+  The field is not part of the diff's canonical JSON. In-place rows
+  still store only the delta there.
 - The evaluator cannot fail and does no I/O. A bad file fails at load,
   as exit 2, before a verdict exists.
 - Old-document warnings are visible and not matchable until a later ADR

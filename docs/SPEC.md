@@ -177,11 +177,12 @@ violation names the limit, the value that was found, and the flag.
 
 ## Policy
 
-The policy file, the matchers, and the verdict are
-[ADR 0013](adr/0013-policy-schema.md). Operators read
-[POLICY.md](POLICY.md). The page is added with the implementation.
+Operators read [POLICY.md](POLICY.md). The schema and the evaluation
+rules are [ADR 0013](adr/0013-policy-schema.md). The YAML parser is
+[ADR 0014](adr/0014-yaml-parser.md).
 
 An omitted `--policy` does not evaluate rules. The run is report-only.
+The CLI does not evaluate a policy yet.
 
 ## Determinism
 
@@ -197,5 +198,6 @@ Package URL parsing is [ADR 0009](adr/0009-purl-normalization.md). The field
 mapping is [ADR 0010](adr/0010-document-mapping.md). The change model is
 [ADR 0011](adr/0011-change-model.md). Version direction is
 [ADR 0012](adr/0012-version-ordering.md). The comparison is
-`bomward_core::diff::diff`. Policy and the report are later work
-packages. The CLI does not call ingest or the diff yet.
+`bomward_core::diff::diff`. Policy is
+[POLICY.md](POLICY.md). The report is a later work package. The CLI does
+not call ingest, the diff, or policy yet.
