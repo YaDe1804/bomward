@@ -155,7 +155,7 @@ fn component_order_does_not_change_the_model() -> Result<(), String> {
 
 #[test]
 fn lockward_shaped_npm_document_is_read() -> Result<(), String> {
-    let bytes = fixture("lockward-npm-1.6.json")?;
+    let bytes = fixture("lockward-old.cdx.json")?;
     let document = read_default(&bytes).map_err(|error| error.to_string())?;
     let (scoped, component) = find(&document, "left-pad")?;
     let ComponentKey::Purl {
@@ -198,20 +198,23 @@ fn lockward_shaped_npm_document_is_read() -> Result<(), String> {
     if scoped_scopes.len() != 1 || other_scopes.len() != 1 || scoped_scopes == other_scopes {
         return Err(format!("scopes {scoped_scopes:?} and {other_scopes:?}"));
     }
+    let left_pad_role = component
+        .versions
+        .values()
+        .next()
+        .map(|stored| stored.role)
+        .ok_or("missing left-pad role")?;
+    if left_pad_role != DependencyRole::Direct {
+        return Err(format!("left-pad role {left_pad_role:?}"));
+    }
     if document
         .warnings
         .iter()
         .any(|warning| warning.kind == WarningKind::RoleUnknown)
-        && document.components.values().all(|component| {
-            component
-                .versions
-                .values()
-                .all(|stored| stored.role == DependencyRole::Unknown)
-        })
     {
-        return Ok(());
+        return Err(format!("{:?}", document.warnings));
     }
-    Err("a document without dependencies should be unknown".to_owned())
+    Ok(())
 }
 
 #[test]
@@ -935,6 +938,43 @@ fn arbitrary_bytes_do_not_panic() -> Result<(), String> {
 }
 
 #[test]
+fn a_document_with_no_components_warns() -> Result<(), String> {
+    let empty = read_default(br#"{"bomFormat":"CycloneDX","specVersion":"1.6"}"#)
+        .map_err(|error| error.to_string())?;
+    let warnings = empty
+        .warnings
+        .iter()
+        .filter(|warning| warning.kind == WarningKind::NoComponents)
+        .count();
+    if warnings != 1 || !empty.components.is_empty() {
+        return Err(format!("{:?}", empty.warnings));
+    }
+    let warning = empty
+        .warnings
+        .iter()
+        .find(|warning| warning.kind == WarningKind::NoComponents)
+        .ok_or("missing warning")?;
+    if warning.kind.id() != "no-components"
+        || warning.kind.message() != "document contains no components"
+        || warning.key.is_some()
+    {
+        return Err(format!("{warning:?}"));
+    }
+    let root_only = read_default(
+        br#"{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"name":"app","version":"1"}}}"#,
+    )
+    .map_err(|error| error.to_string())?;
+    if root_only
+        .warnings
+        .iter()
+        .any(|warning| warning.kind == WarningKind::NoComponents)
+    {
+        return Err(format!("{:?}", root_only.warnings));
+    }
+    Ok(())
+}
+
+#[test]
 fn one_hundred_thousand_components_are_read() -> Result<(), String> {
     let mut json = String::from(r#"{"bomFormat":"CycloneDX","specVersion":"1.6","components":["#);
     json.reserve(8_000_000);
@@ -956,6 +996,70 @@ fn one_hundred_thousand_components_are_read() -> Result<(), String> {
     }
     if elapsed.as_secs() > 60 {
         return Err(format!("too slow: {elapsed:?}"));
+    }
+    Ok(())
+}
+
+#[test]
+fn hash_algorithm_names_use_the_cyclonedx_spelling() -> Result<(), String> {
+    let document = read_default(
+        br#"{"bomFormat":"CycloneDX","specVersion":"1.6","components":[{"name":"left","version":"1","hashes":[{"alg":"sha-256","content":"ABCDEF"},{"alg":"blake3","content":"abcd"},{"alg":"streebog-256","content":"abcd"}]}]}"#,
+    )
+    .map_err(|error| error.to_string())?;
+    let hashes = document
+        .components
+        .values()
+        .next()
+        .and_then(|component| component.versions.values().next())
+        .map(|stored| stored.attributes.hashes.clone())
+        .ok_or("missing hashes")?;
+    let names: Vec<&str> = hashes.iter().map(|hash| hash.alg.as_str()).collect();
+    if names != ["BLAKE3", "SHA-256", "Streebog-256"] {
+        return Err(format!("{names:?}"));
+    }
+    let sha = hashes
+        .iter()
+        .find(|hash| hash.alg == "SHA-256")
+        .ok_or("missing SHA-256")?;
+    if sha.content != "abcdef" {
+        return Err(sha.content.clone());
+    }
+    if document
+        .warnings
+        .iter()
+        .any(|warning| warning.kind == WarningKind::UnknownHashAlgorithm)
+    {
+        return Err(format!("{:?}", document.warnings));
+    }
+    Ok(())
+}
+
+#[test]
+fn an_unknown_hash_algorithm_is_kept_and_warned() -> Result<(), String> {
+    let document = read_default(
+        b"{\"bomFormat\":\"CycloneDX\",\"specVersion\":\"1.6\",\"components\":[{\"name\":\"left\",\"version\":\"1\",\"hashes\":[{\"alg\":\"not-a-hash\\u001b[31m\",\"content\":\"abcd\"}]}]}",
+    )
+    .map_err(|error| error.to_string())?;
+    let alg = document
+        .components
+        .values()
+        .next()
+        .and_then(|component| component.versions.values().next())
+        .and_then(|stored| stored.attributes.hashes.iter().next())
+        .map(|hash| hash.alg.clone())
+        .ok_or("missing hash")?;
+    if alg != "not-a-hash\u{1b}[31m" {
+        return Err(format!("{alg:?}"));
+    }
+    let warning = document
+        .warnings
+        .iter()
+        .find(|warning| warning.kind == WarningKind::UnknownHashAlgorithm)
+        .ok_or("missing unknown-hash-algorithm")?;
+    if warning.kind.message() != "unknown hash algorithm"
+        || warning.key.as_ref().map(key_name) != Some("left")
+    {
+        return Err(format!("{:?}", document.warnings));
     }
     Ok(())
 }

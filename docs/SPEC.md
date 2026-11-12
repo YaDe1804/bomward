@@ -1,8 +1,8 @@
 # bomward specification
 
 Status of this document: contract for v0.1. The library can read a CycloneDX
-JSON document into the model. The CLI parses `diff` and still exits with
-code 2. See [ARCHITECTURE.md](ARCHITECTURE.md).
+JSON document into the model and diff two models. The CLI parses `diff`
+and still exits with code 2. See [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Purpose
 
@@ -27,34 +27,56 @@ Data flow: `ingest` → `model` → `diff` → `policy` → `report`.
 
 Each component key maps to a set of versions, defined in
 [ADR 0005](adr/0005-component-identity.md). The diff compares those sets.
+[ADR 0011](adr/0011-change-model.md) is the change model.
 
-Diff kinds in v0.1:
+Diff kinds in v0.1, in sort order:
 
-- component added
-- component removed
-- version added or removed inside a component's version set
-- license changed
-- hash changed
-- supplier changed
+- `added` — a version exists only in the new document
+- `removed` — a version exists only in the old document
+- `version-changed` — the key has exactly one version on each side, and they differ
+- `license-changed` — the license set differs for a version in both documents
+- `supplier-changed` — the supplier set differs for a version in both documents
+- `hash-changed` — a shared algorithm has different content
+- `hash-coverage-changed` — an algorithm was added or removed, with no contradiction on a shared algorithm
+- `scope-changed` — the CycloneDX `scope` set differs
+- `role-changed` — the graph role differs
+
+`version-changed` carries both attribute sets and one flag per attribute
+kind. It does not also emit those kinds. Its direction is `upgrade`,
+`downgrade`, or `unknown` ([ADR 0012](adr/0012-version-ordering.md)).
+Only `npm` and `cargo` use SemVer precedence, and only when both
+versions parse. Anything else, including equal precedence, is
+`unknown`. The root component is a separate entry, not one of these
+kinds. A component that loses or gains its purl changes key and is
+reported as `removed` plus `added`.
 
 License, hash, and supplier changes apply to a version that is in both
-sets. Hash content is stored as lowercase hex, so letter case is not a
-hash change. The algorithm name keeps its case. An invalid `purl` does not reject the file. The key falls back to
-`group` plus `name`, and the report counts and lists a warning. When a
-component `version` and its purl version differ, the purl version is
-stored and the document warns `version-mismatch`. A JSON object that
-repeats a key keeps the last value and warns `duplicate-key`.
+sets. Hash content is compared as lowercase hex, so letter case is not a
+hash change. The algorithm name is the CycloneDX spelling, so `SHA-256`
+and `sha-256` are one algorithm. A name outside that enumeration is
+kept and warns `unknown-hash-algorithm`. An invalid `purl` does
+not reject the file. The key falls back to `group` plus `name`, and the
+report counts and lists a warning. When a component `version` and its
+purl version differ, the purl version is stored and the document warns
+`version-mismatch`. A JSON object that repeats a key keeps the last
+value and warns `duplicate-key`.
 
-Each change records whether that version is direct, transitive, the root,
-or unknown in the document that contains it. The graph node is one key
-together with one version. Two versions of one package can have two roles.
-[ADR 0010](adr/0010-document-mapping.md) defines the four roles. A document
-with no `metadata.component`, or with no `dependencies` field, marks every
-version unknown and counts one warning, `role-unknown`. When the graph
-is present, a version that stays unknown also counts one warning,
-`unreachable`, once per component key. `scope` in a
-component is only the CycloneDX field. `bom-ref` is never compared
-across the two documents.
+Each dependency change carries `old_role` and `new_role`. The role a
+policy sees is the one in the new document, and for `removed` the one
+in the old document. A version whose role is `root` is not a dependency
+change. The graph node is one key together with one version. Two
+versions of one package can have two roles.
+[ADR 0010](adr/0010-document-mapping.md) defines the four roles.
+`metadata.component` is `root` even when `dependencies` is absent. A
+document with no `metadata.component`, or with no `dependencies` field,
+counts one warning, `role-unknown`. When the graph is present, a version
+that stays unknown also counts one warning, `unreachable`, once per
+component key. Roles are compared only when neither document has
+`role-unknown`. The diff records that as `roles_comparable`. A document
+with no components warns `no-components`. A document that only names
+`metadata.component` is not empty. `scope` in a component is only the
+CycloneDX field. A missing scope is stored as absent and compares as
+`required`. `bom-ref` is never compared across the two documents.
 
 ## Non-goals for v0.1
 
@@ -163,7 +185,7 @@ rules:
   - id: no-new-direct-dependencies
     description: New direct dependencies need a review.
     when:
-      change: added # added | removed | version-changed | license-changed | hash-changed | supplier-changed
+      change: added # added | removed | version-changed | license-changed | supplier-changed | hash-changed | hash-coverage-changed | scope-changed | role-changed
       role: direct # root | direct | transitive | unknown | any
     decision: deny # allow | deny
 ```
@@ -188,5 +210,8 @@ The rule is [ADR 0007](adr/0007-exit-codes-and-determinism.md).
 
 The parser is the owned model in [ADR 0008](adr/0008-cyclonedx-parser.md).
 Package URL parsing is [ADR 0009](adr/0009-purl-normalization.md). The field
-mapping is [ADR 0010](adr/0010-document-mapping.md). Diff, policy, and the
-report are later work packages. The CLI does not call ingest yet.
+mapping is [ADR 0010](adr/0010-document-mapping.md). The change model is
+[ADR 0011](adr/0011-change-model.md). Version direction is
+[ADR 0012](adr/0012-version-ordering.md). The comparison is
+`bomward_core::diff::diff`. Policy and the report are later work
+packages. The CLI does not call ingest or the diff yet.

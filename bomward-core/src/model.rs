@@ -245,7 +245,7 @@ pub struct ContentHash {
 
 /// How one version relates to the root of this document.
 ///
-/// AP2 decides how a report prints these. Ingest only records them.
+/// The diff copies the role onto each change. The report prints it.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum DependencyRole {
@@ -303,6 +303,16 @@ pub enum WarningKind {
     ///
     /// Several unreachable versions of one key produce one warning.
     Unreachable,
+    /// The document has no components at all. Id: `no-components`.
+    ///
+    /// A service BOM can be valid and still name nothing. The warning has
+    /// no component key.
+    NoComponents,
+    /// A hash algorithm is not in the `CycloneDX` enumeration. Id: `unknown-hash-algorithm`.
+    ///
+    /// The name is stored as written. The warning text does not repeat it.
+    /// One warning per component key.
+    UnknownHashAlgorithm,
 }
 
 impl WarningKind {
@@ -318,6 +328,8 @@ impl WarningKind {
             Self::VersionMismatch => "version-mismatch",
             Self::DuplicateKey => "duplicate-key",
             Self::Unreachable => "unreachable",
+            Self::NoComponents => "no-components",
+            Self::UnknownHashAlgorithm => "unknown-hash-algorithm",
         }
     }
 
@@ -333,6 +345,8 @@ impl WarningKind {
             Self::VersionMismatch => "component version differs from purl version",
             Self::DuplicateKey => "json object contains a duplicate key",
             Self::Unreachable => "component is not reachable from the root",
+            Self::NoComponents => "document contains no components",
+            Self::UnknownHashAlgorithm => "unknown hash algorithm",
         }
     }
 }

@@ -49,7 +49,7 @@ Each value is a sorted set. Order in the file does not matter.
 | Attribute | Source | Set element |
 | --- | --- | --- |
 | licenses | `licenses[]` | `license.id`, `license.name`, and `expression`, each as its own string |
-| hashes | `hashes[]` | the pair `(alg, content)` when both are strings. `content` is stored as lowercase ASCII. `alg` is not. |
+| hashes | `hashes[]` | the pair `(alg, content)` when both are strings. `content` is stored as lowercase ASCII. `alg` is stored in the CycloneDX `hash-alg` spelling when the name matches that enumeration without regard to case. A name outside the enumeration is stored unchanged. |
 | supplier | `supplier.name` | the name string |
 | scope | `scope` | the scope string (`required`, `optional`, `excluded`, or whatever the file says) |
 | type | `type` | the type string |
@@ -60,7 +60,14 @@ name, contributes nothing. It is not an error. Names and license strings
 are stored as they appear, including control characters and Markdown.
 They are not truncated. Hash content is stored as lowercase ASCII so
 `ABCD` and `abcd` are one hash and do not later look like a hash change.
-The algorithm name is stored as it appears.
+`SHA-256` and `sha-256` are one algorithm. The spelling is the JSON
+enumeration shared by CycloneDX 1.4, 1.5, and 1.6 (`MD5`, `SHA-1`,
+`SHA-256`, `SHA-384`, `SHA-512`, `SHA3-256`, `SHA3-384`, `SHA3-512`,
+`BLAKE2b-256`, `BLAKE2b-384`, `BLAKE2b-512`, `BLAKE3`). Spec 1.7 adds
+`Streebog-256` and `Streebog-512`. bomward accepts that union for every
+supported spec version. A name that matches none of them is kept as
+written, and that component gets one warning, `unknown-hash-algorithm`.
+The warning text does not repeat the name.
 
 ### The same key and version with different attributes
 
@@ -102,13 +109,17 @@ package are two nodes.
 | `transitive` | Reachable from a direct version. The walk keeps a visited set of `(key, version)` and stops on a node it has already seen. |
 | `unknown` | Not the root version and not reachable. |
 
-When `metadata.component` is absent, or the `dependencies` field is
+`metadata.component` is always the root version, including when the
+document has no `dependencies` field. When `metadata.component` is
 absent, every version's role is `unknown` and the document gets one
-warning, kind `role-unknown`. An empty `dependencies` array is present:
-the root's role is `root`, and every other version stays `unknown` and
-gets `unreachable`. A missing `dependencies` field does not also warn
-`unreachable`; that case is only `role-unknown`. How AP2 prints these
-roles is not decided here.
+warning, kind `role-unknown`. When the component is present but the
+`dependencies` field is absent, that version's role is `root`, every
+other version stays `unknown`, and the document still gets one
+`role-unknown`. An empty `dependencies` array is present: the root's
+role is `root`, and every other version stays `unknown` and gets
+`unreachable`. A missing `dependencies` field does not also warn
+`unreachable`. The diff compares roles only when neither document
+carries `role-unknown` ([ADR 0011](0011-change-model.md)).
 
 `scope` is only the CycloneDX field (`required`, `optional`,
 `excluded`, or whatever string the file uses). It is an attribute of a
@@ -125,11 +136,13 @@ one warning.
 | `invalid-purl` | A purl was present and not valid. Text: `invalid purl; fell back to group and name`. |
 | `orphan-ref` | A `ref` or `dependsOn` matches no component. |
 | `duplicate-bom-ref` | Two components share a `bom-ref`. |
-| `role-unknown` | No root component, or no `dependencies` field. The role is `unknown`. |
+| `role-unknown` | No root component, or no `dependencies` field. A root that is present is still `root`. Every other role is `unknown`. |
 | `conflicting-attributes` | The same key and version carried different attributes. |
 | `version-mismatch` | The component `version` and the purl version differ. The purl version is stored. |
 | `duplicate-key` | A JSON object repeated a key. The last value is kept. The warning has no component key. |
 | `unreachable` | A `dependencies` field and a root are present, and a version stayed `unknown`. Text: `component is not reachable from the root`. One warning per key. |
+| `no-components` | The document has no components. Text: `document contains no components`. The warning has no component key. A document that only has `metadata.component` is not empty. |
+| `unknown-hash-algorithm` | A hash `alg` is not in the CycloneDX enumeration for 1.4–1.7. Text: `unknown hash algorithm`. The name is not repeated. One warning per component key. |
 
 Warnings do not change the error returned for a valid document. They do
 not change the exit code (ADR 0005).
