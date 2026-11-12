@@ -175,29 +175,13 @@ requested value and the maximum. A cycle in `dependencies` is stored;
 it is not an error. A file-size, component-count, or component-nesting
 violation names the limit, the value that was found, and the flag.
 
-## Policy sketch
+## Policy
 
-AP3 freezes the schema. v0.1 aims at a YAML file of this shape:
+The policy file, the matchers, and the verdict are
+[ADR 0013](adr/0013-policy-schema.md). Operators read
+[POLICY.md](POLICY.md). The page is added with the implementation.
 
-```yaml
-default: allow # allow | deny
-rules:
-  - id: no-new-direct-dependencies
-    description: New direct dependencies need a review.
-    when:
-      change: added # added | removed | version-changed | license-changed | supplier-changed | hash-changed | hash-coverage-changed | scope-changed | role-changed
-      role: direct # root | direct | transitive | unknown | any
-    decision: deny # allow | deny
-```
-
-Evaluation rules for that future schema:
-
-- `deny` outranks `allow`.
-- Every matching `deny` is included in the verdict, sorted by `id`.
-- If no rule matches, `default` applies.
-- An omitted `--policy` does not evaluate rules. The run is report-only.
-
-This sketch is not parsed in the foundation.
+An omitted `--policy` does not evaluate rules. The run is report-only.
 
 ## Determinism
 
