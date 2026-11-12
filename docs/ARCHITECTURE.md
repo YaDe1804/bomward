@@ -19,15 +19,15 @@ unchecked indexing, `todo!`, and `dbg!` in every target.
 
 ## Modules
 
-`bomward-core` exposes five modules. Ingest, the model, and the diff have
-types and functions. Policy and report are still empty apart from their docs.
+`bomward-core` exposes five modules. Ingest, the model, the diff, and
+policy have types and functions. Report is still empty apart from its docs.
 
 | Module | Responsibility | Work package |
 | --- | --- | --- |
 | `ingest` | CycloneDX JSON → model, enforcing the input limits. | AP1, done |
 | `model` | Normalized components and identities. | AP1, done |
 | `diff` | Two documents → a typed, deterministic diff. | AP2, done |
-| `policy` | YAML rules → a verdict with reasons. | AP3 |
+| `policy` | YAML rules → a verdict with reasons. | AP3, done |
 | `report` | Terminal, Markdown, and JSON rendering. | AP4 |
 
 Data flow, and the only direction of calls:
@@ -45,8 +45,8 @@ files. `ingest` is the only module that interprets CycloneDX JSON.
 `bomward-core` returns `bomward_core::Error`, a `thiserror` enum. Library
 functions do not panic and do not exit the process.
 
-`NotImplemented` remains for policy and report. Ingest adds I/O,
-invalid document, unsupported `specVersion`, limit variants, and a
+`NotImplemented` remains for report. Policy adds `InvalidPolicy`.
+Ingest adds I/O, invalid document, unsupported `specVersion`, limit variants, and a
 usage error when `--max-depth` is above 63. The limit variant carries
 the kind (file size, component count, component nesting, or JSON
 nesting), the value that was found, and the limit. Display text matches
@@ -55,8 +55,9 @@ so the enum is not a stability promise.
 
 `bomward-cli` converts library errors and usage failures into a message on
 stderr and an exit code. It may use `anyhow`. A usage error, a rejected
-input, and the current not-implemented path all exit 2. A policy denial
-exits 1, once policy exists. See [ADR 0007](adr/0007-exit-codes-and-determinism.md).
+input, and the current not-implemented path all exit 2. A policy
+denial exits 1 once the CLI evaluates a verdict. It does not yet.
+See [ADR 0007](adr/0007-exit-codes-and-determinism.md).
 
 ## CLI
 
@@ -84,6 +85,24 @@ direction. `npm` and `cargo` use `semver` 1.0.28 precedence. Every other
 type, a failed parse, and equal precedence are `unknown`. `diff` takes
 two `&Document` values, cannot fail, and does not read files. The CLI
 does not call it yet.
+
+## Policy
+
+[ADR 0013](adr/0013-policy-schema.md) is the schema and the evaluation.
+[POLICY.md](POLICY.md) is the page operators read.
+[ADR 0014](adr/0014-yaml-parser.md) pins `noyalib` 0.0.60 and rejects
+aliases and duplicate keys. License ids are read with `spdx` 0.13.6.
+`read_str`, `read_bytes`, and `read_path` validate the file.
+`evaluate` takes a policy and a diff, cannot fail, and does no I/O.
+The CLI does not call either yet. Exit code 1 is
+`Verdict::exit_code` when the effective result is `deny`. A file that
+fails to load is `Error::InvalidPolicy` and will be exit code 2 once
+the CLI is wired.
+
+Each change carries the attributes of the version under review
+(`removed` uses the old version, every other kind the new one). That
+snapshot is not part of the diff's canonical JSON. In-place rows still
+store only the delta there, and a policy matcher needs the version itself.
 
 ## Supply chain of the tool
 

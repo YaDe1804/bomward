@@ -175,29 +175,14 @@ requested value and the maximum. A cycle in `dependencies` is stored;
 it is not an error. A file-size, component-count, or component-nesting
 violation names the limit, the value that was found, and the flag.
 
-## Policy sketch
+## Policy
 
-AP3 freezes the schema. v0.1 aims at a YAML file of this shape:
+Operators read [POLICY.md](POLICY.md). The schema and the evaluation
+rules are [ADR 0013](adr/0013-policy-schema.md). The YAML parser is
+[ADR 0014](adr/0014-yaml-parser.md).
 
-```yaml
-default: allow # allow | deny
-rules:
-  - id: no-new-direct-dependencies
-    description: New direct dependencies need a review.
-    when:
-      change: added # added | removed | version-changed | license-changed | supplier-changed | hash-changed | hash-coverage-changed | scope-changed | role-changed
-      role: direct # root | direct | transitive | unknown | any
-    decision: deny # allow | deny
-```
-
-Evaluation rules for that future schema:
-
-- `deny` outranks `allow`.
-- Every matching `deny` is included in the verdict, sorted by `id`.
-- If no rule matches, `default` applies.
-- An omitted `--policy` does not evaluate rules. The run is report-only.
-
-This sketch is not parsed in the foundation.
+An omitted `--policy` does not evaluate rules. The run is report-only.
+The CLI does not evaluate a policy yet.
 
 ## Determinism
 
@@ -213,5 +198,6 @@ Package URL parsing is [ADR 0009](adr/0009-purl-normalization.md). The field
 mapping is [ADR 0010](adr/0010-document-mapping.md). The change model is
 [ADR 0011](adr/0011-change-model.md). Version direction is
 [ADR 0012](adr/0012-version-ordering.md). The comparison is
-`bomward_core::diff::diff`. Policy and the report are later work
-packages. The CLI does not call ingest or the diff yet.
+`bomward_core::diff::diff`. Policy is
+[POLICY.md](POLICY.md). The report is a later work package. The CLI does
+not call ingest, the diff, or policy yet.

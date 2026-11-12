@@ -6,8 +6,8 @@
 //! [`report`]. This crate does not access the network and does not execute
 //! untrusted code.
 //!
-//! Ingest, the model, and the diff are implemented. Policy and report still
-//! return [`Error::NotImplemented`].
+//! Ingest, the model, the diff, and policy are implemented. Report still
+//! returns [`Error::NotImplemented`].
 
 #![forbid(unsafe_code)]
 

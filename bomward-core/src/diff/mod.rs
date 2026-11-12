@@ -176,6 +176,14 @@ pub struct Change {
     pub new_role: Option<DependencyRole>,
     /// Values the report needs for this kind.
     pub detail: ChangeDetail,
+    /// Attributes of the version a policy judges.
+    ///
+    /// `removed` carries the old version. Every other kind carries the new
+    /// version. This is not part of the canonical JSON: in-place rows store
+    /// only the delta in [`ChangeDetail`], and a policy still has to see the
+    /// version those matchers describe.
+    #[serde(skip_serializing)]
+    pub judged: VersionAttributes,
 }
 
 /// Change kinds from ADR 0011, in sort order.
@@ -428,6 +436,34 @@ fn summarize(changes: &[Change]) -> Summary {
             .map(|(role, counts)| RoleCount { role, counts })
             .collect(),
     }
+}
+
+/// Scope set used for comparison. An empty set is `required`.
+pub(crate) fn effective_scopes(scopes: &BTreeSet<String>) -> BTreeSet<String> {
+    compare::scopes_for_compare(scopes)
+}
+
+/// Hash algorithms added, removed, or dropped entirely between two versions.
+pub(crate) fn hash_coverage(
+    old: &BTreeSet<crate::model::ContentHash>,
+    new: &BTreeSet<crate::model::ContentHash>,
+) -> HashCoverage {
+    let delta = compare::hash_delta(old, new);
+    HashCoverage {
+        added: delta.added,
+        removed: delta.removed,
+        all_dropped: delta.all_dropped,
+    }
+}
+
+/// The coverage half of a hash comparison.
+pub(crate) struct HashCoverage {
+    /// Algorithms present only on the new side.
+    pub(crate) added: BTreeSet<String>,
+    /// Algorithms present only on the old side.
+    pub(crate) removed: BTreeSet<String>,
+    /// The new side has no hashes and the old side had some.
+    pub(crate) all_dropped: bool,
 }
 
 fn policy_role(change: &Change) -> Option<DependencyRole> {

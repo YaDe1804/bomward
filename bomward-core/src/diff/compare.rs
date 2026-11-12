@@ -216,6 +216,7 @@ fn removed_change(key: &ComponentKey, version: &VersionId, stored: &Version) -> 
         new_version: None,
         old_role: Some(stored.role),
         new_role: None,
+        judged: stored.attributes.clone(),
         detail: ChangeDetail::Removed {
             attributes: Box::new(stored.attributes.clone()),
         },
@@ -240,6 +241,7 @@ fn added_change(
         new_version: Some(version.clone()),
         old_role: None,
         new_role: Some(stored.role),
+        judged: stored.attributes.clone(),
         detail: ChangeDetail::Added {
             attributes: Box::new(stored.attributes.clone()),
             introduced_by: provenance.introduced_by(&node),
@@ -264,6 +266,7 @@ fn version_change(
         new_version: Some(new_id.clone()),
         old_role: Some(old_version.role),
         new_role: Some(new_version.role),
+        judged: new_version.attributes.clone(),
         detail: ChangeDetail::VersionChanged {
             direction: direction(key, old_id, new_id),
             old_attributes: Box::new(old_version.attributes.clone()),
@@ -320,7 +323,7 @@ fn push_attribute_changes(
 ///
 /// The model keeps the empty set, so a report can still show that the
 /// field was absent. Only the comparison fills it in.
-fn scopes_for_compare(scopes: &BTreeSet<String>) -> BTreeSet<String> {
+pub(super) fn scopes_for_compare(scopes: &BTreeSet<String>) -> BTreeSet<String> {
     if scopes.is_empty() {
         BTreeSet::from([String::from("required")])
     } else {
@@ -381,6 +384,7 @@ impl Shared<'_> {
             new_version: Some(self.version.clone()),
             old_role: Some(self.old.role),
             new_role: Some(self.new.role),
+            judged: self.new.attributes.clone(),
             detail,
         }
     }
@@ -419,14 +423,14 @@ fn set_delta(
     (added, removed)
 }
 
-struct HashDelta {
+pub(super) struct HashDelta {
     conflicts: Vec<HashConflict>,
-    added: BTreeSet<String>,
-    removed: BTreeSet<String>,
-    all_dropped: bool,
+    pub(super) added: BTreeSet<String>,
+    pub(super) removed: BTreeSet<String>,
+    pub(super) all_dropped: bool,
 }
 
-fn hash_delta(old: &BTreeSet<ContentHash>, new: &BTreeSet<ContentHash>) -> HashDelta {
+pub(super) fn hash_delta(old: &BTreeSet<ContentHash>, new: &BTreeSet<ContentHash>) -> HashDelta {
     let old_groups = group_hashes(old);
     let new_groups = group_hashes(new);
     let mut conflicts = Vec::new();

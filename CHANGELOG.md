@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Policy version 1: `bomward-core` reads a YAML policy, rejects unknown
+  fields, duplicate keys, and aliases, and evaluates a diff into a
+  verdict. `mode: warn` turns `deny` into `warn`. Exit code 1 is
+  `Verdict::exit_code` when the effective result is `deny`. The CLI
+  does not call this yet. See [docs/POLICY.md](docs/POLICY.md) and
+  ADRs 0013 and 0014. Example files live in `examples/policies/`.
 - Repository foundation: public docs, ADRs 0001–0007, and the Cargo workspace.
 - `bomward` parses `diff <OLD> <NEW>` with `--policy` and `--format`, then
   exits 2 with `not implemented yet`. It does not review SBOMs yet.
@@ -27,6 +33,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `license_status: unrecognized` also matches a string that contains
+  SPDX ids when the whole string is not one id and not a valid
+  expression. Qualifiers in a package pattern must be the canonical
+  form the key stores, and `***` is rejected.
+- License matching keeps SPDX ids from a string that is not a valid
+  expression, and `GPL-3.0+` matches both `GPL-3.0-or-later` and
+  `GPL-3.0`. `license_status: [unrecognized]` matches free text.
+  `*` and `**` no longer cross `?` or `#`. An unencoded `@` in a
+  package pattern's namespace or name is an error. See
+  [docs/POLICY.md](docs/POLICY.md).
 - The graph position is a role (`root`, `direct`, `transitive`,
   `unknown`). A missing graph warns `role-unknown`. `scope` is only the
   CycloneDX field. The policy sketch uses `role:`.
