@@ -105,3 +105,4 @@ a comment without granting the untrusted workflow write access.
   Action pins. The default pin is `v0.1.0`.
 - The self-test workflow is the only place that sets
   `BOMWARD_USE_LOCAL=1`.
+- Callers follow [the Action guide](../ACTION.md).
