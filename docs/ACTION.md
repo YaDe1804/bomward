@@ -1,9 +1,8 @@
 # GitHub Action
 
-**Status: pre-release.** The Action is in this repository. The release
-tag it downloads, `v0.1.0`, is not published yet. A foreign workflow
-that uses the default pin fails at the download until that tag exists.
-The trust boundary is [ADR 0017](adr/0017-github-action.md).
+**Status: 0.1.0.** Pin the Action at `YaDe1804/bomward@v0.1.0`. The
+release for that tag carries the archives and `SHA256SUMS`. The trust
+boundary is [ADR 0017](adr/0017-github-action.md).
 
 The Action compares the pull-request SBOM with the baseline SBOM and,
 when a policy path is set, judges the diff. It writes the terminal

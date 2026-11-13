@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   depth 32/33, JSON depth 127/128, dependency cycles, and a 100,000-hash
   component under the file-size limit. See [docs/FUZZING.md](docs/FUZZING.md)
   and [ADR 0018](docs/adr/0018-fuzzing-and-attribute-amplification.md).
-- GitHub Action `bomward review`. It diffs the pull-request SBOM against
+- GitHub Action `bomward SBOM review`. It diffs the pull-request SBOM against
   the baseline from the base commit, reads the policy from that same
   commit, and posts or updates one pull-request comment. The release
   asset is checked against `SHA256SUMS` before it runs. See

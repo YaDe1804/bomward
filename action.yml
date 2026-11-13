@@ -1,5 +1,5 @@
-name: "bomward review"
-description: "Diff a pull request SBOM against the base branch and apply a policy from that same commit. The Action reads the new SBOM as data and does not run pull-request code."
+name: "bomward SBOM review"
+description: "Diff a pull-request SBOM against the base branch and apply that branch's policy. Pull-request code is not run."
 author: "Deniz Yayvan"
 branding:
   icon: shield
