@@ -104,12 +104,12 @@ matches only that exact pattern. A pattern that does not start with
 matches only a pattern that names them, in the canonical sorted form the
 key stores, including percent-encoding.
 The pattern for that key is the canonical string itself:
-`pkg:npm/%40acme/tool?repository_url=https:%2F%2Fevil.example`.
+`pkg:npm/%40acme/tool?repository_url=https:%2F%2Fnpm.acme.example`.
 A qualifier section that is empty, unsorted, or still contains the raw
 characters is a validation error, and the message shows that spelling.
 An empty subpath after `#` is a validation error. `***` and any longer
 run of `*` are validation errors. `pkg:npm/%40acme/*` does not match
-`pkg:npm/%40acme/tool?repository_url=https:%2F%2Fevil.example`.
+`pkg:npm/%40acme/tool?repository_url=https:%2F%2Fnpm.acme.example`.
 
 An unencoded `@` in the namespace or the name is a validation error that
 tells the author to write `%40`. The same error covers the other

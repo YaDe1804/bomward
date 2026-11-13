@@ -751,7 +751,7 @@ fn package_patterns_do_not_skip_qualifiers() -> Result<(), Box<dyn std::error::E
     let mut qualifiers = BTreeMap::new();
     qualifiers.insert(
         "repository_url".to_owned(),
-        "https://evil.example".to_owned(),
+        "https://npm.acme.example".to_owned(),
     );
     let key = ComponentKey::Purl {
         ty: "npm".to_owned(),
@@ -772,7 +772,7 @@ fn package_patterns_do_not_skip_qualifiers() -> Result<(), Box<dyn std::error::E
     );
 
     let named = rule(
-        "    unless: [\"pkg:npm/%40acme/*?repository_url=https:%2F%2Fevil.example\"]\n    when:\n      change: [added]\n    decision: deny\n",
+        "    unless: [\"pkg:npm/%40acme/*?repository_url=https:%2F%2Fnpm.acme.example\"]\n    when:\n      change: [added]\n    decision: deny\n",
     );
     let dropped = judge(&named, &old, &new)?;
     assert_eq!(
@@ -797,13 +797,13 @@ fn package_patterns_do_not_skip_qualifiers() -> Result<(), Box<dyn std::error::E
 
 #[test]
 fn qualifier_patterns_use_the_canonical_form() -> Result<(), Box<dyn std::error::Error>> {
-    const CANONICAL: &str = "pkg:npm/%40acme/tool?repository_url=https:%2F%2Fevil.example";
+    const CANONICAL: &str = "pkg:npm/%40acme/tool?repository_url=https:%2F%2Fnpm.acme.example";
     let old = empty_document();
     let mut new = empty_document();
     let mut qualifiers = BTreeMap::new();
     qualifiers.insert(
         "repository_url".to_owned(),
-        "https://evil.example".to_owned(),
+        "https://npm.acme.example".to_owned(),
     );
     put(
         &mut new,
@@ -828,11 +828,14 @@ fn qualifier_patterns_use_the_canonical_form() -> Result<(), Box<dyn std::error:
 
     let rejected = [
         (
-            "pkg:npm/%40acme/tool?repository_url=https://evil.example",
-            "https:%2F%2Fevil.example",
+            "pkg:npm/%40acme/tool?repository_url=https://npm.acme.example",
+            "https:%2F%2Fnpm.acme.example",
         ),
         ("pkg:npm/widget?b=1&a=2", "a=2&b=1"),
-        ("pkg:npm/widget?", "repository_url=https:%2F%2Fevil.example"),
+        (
+            "pkg:npm/widget?",
+            "repository_url=https:%2F%2Fnpm.acme.example",
+        ),
         ("pkg:npm/widget#", "subpath"),
         ("***", "wildcard"),
         ("****", "wildcard"),

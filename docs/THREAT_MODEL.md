@@ -49,14 +49,21 @@ inside bomward.
 
 ### Output injection
 
-Component names, licenses, and supplier strings are copied into Markdown
-that GitHub renders, and into terminal logs that interpret ANSI escapes.
+Component names, licenses, suppliers, hash algorithms, and other SBOM
+strings are copied into Markdown that GitHub renders, and into terminal
+logs that interpret control characters.
 
-Mitigation: terminal and Markdown output escape control characters
-(U+0000–U+001F and U+007F), including newline and ESC, as `\u{XXXX}`.
-Markdown output also escapes `` \ ` * _ { } [ ] ( ) # + - . ! | < > ``.
-JSON output uses JSON string encoding only. The terminal format emits no
-ANSI color. The successful report does not include local paths.
+Mitigation, from [ADR 0015](adr/0015-report-formats-and-escaping.md):
+Markdown writes every SBOM string inside a code span. Before that span
+is built, and in the terminal format, invisible characters are written
+as `\u{XXXX}`: C0, DEL, C1, format characters, default-ignorable
+characters, and every space except U+0020. A newline cannot leave the
+span, and two names that differ only by an invisible character do not
+look the same. Visible lookalikes (homoglyphs) are not covered. The
+only HTML the report emits is `<details>` and `<summary>`. The terminal
+format emits no ANSI color. JSON uses one JSON string encoding and does
+not add a second escape layer. The report does not include a timestamp,
+a local path, or a host name.
 
 ### Path confusion
 

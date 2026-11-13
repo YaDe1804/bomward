@@ -1,0 +1,55 @@
+Compare two `CycloneDX` JSON documents and judge the change
+
+Usage: bomward diff [OPTIONS] <OLD> <NEW>
+
+Arguments:
+  <OLD>
+          Baseline `CycloneDX` JSON document
+
+  <NEW>
+          Candidate `CycloneDX` JSON document
+
+Options:
+      --policy <FILE>
+          Policy file used to judge the diff.
+          
+          Omit this flag for report-only mode, which exits 0. Every output then includes the sentence "No policy was applied."
+
+      --format <FORMAT>
+          Report format
+
+          Possible values:
+          - terminal: Plain text for a terminal, without ANSI color
+          - markdown: Markdown suitable for a pull-request comment
+          - json:     One JSON document
+          
+          [default: terminal]
+
+      --output <FILE>
+          Write the report to this file instead of stdout.
+          
+          The file is created or truncated. Parent directories are not created. Stdout stays empty.
+
+      --max-file-bytes <MAX_FILE_BYTES>
+          Maximum size in bytes of one input file. Default: 33554432 (32 MiB).
+          
+          A violation names this limit, the size that was found, and `--max-file-bytes`.
+          
+          [default: 33554432]
+
+      --max-components <MAX_COMPONENTS>
+          Maximum number of component objects, including nested components. Default: 100000.
+          
+          A violation names this limit, the count that was found, and `--max-components`.
+          
+          [default: 100000]
+
+      --max-depth <MAX_DEPTH>
+          Maximum nesting of components inside components. Default: 32. Maximum: 63.
+          
+          Does not limit dependency-graph path length or JSON container depth. JSON containers are capped at 127, and that error does not name this flag. A value above 63 is rejected before the files are read. A component-nesting violation names this limit, the depth that was found, and `--max-depth`.
+          
+          [default: 32]
+
+  -h, --help
+          Print help (see a summary with '-h')

@@ -179,7 +179,7 @@ fn check_star_run(pattern: &str) -> Result<(), PatternError> {
 }
 
 /// Qualifier text in the form `PackageUrl` stores it, as in the policy docs.
-const QUALIFIER_EXAMPLE: &str = "repository_url=https:%2F%2Fevil.example";
+const QUALIFIER_EXAMPLE: &str = "repository_url=https:%2F%2Fnpm.acme.example";
 
 fn check_qualifiers(pattern: &str) -> Result<(), PatternError> {
     if pattern == "**" {
@@ -346,7 +346,7 @@ mod tests {
 
     #[test]
     fn wildcards_do_not_cross_qualifiers_or_subpath() -> Result<(), PatternError> {
-        let qualified = "pkg:npm/%40acme/tool?repository_url=https:%2F%2Fevil.example";
+        let qualified = "pkg:npm/%40acme/tool?repository_url=https:%2F%2Fnpm.acme.example";
         let star = Pattern::compile("pkg:npm/%40acme/*")?;
         assert!(!star.matches(qualified));
         assert!(!star.matches("pkg:npm/%40acme/tool#src"));
@@ -355,7 +355,7 @@ mod tests {
         assert!(!glob.matches(qualified));
         assert!(glob.matches("pkg:npm/%40acme/tool"));
         let explicit =
-            Pattern::compile("pkg:npm/%40acme/*?repository_url=https:%2F%2Fevil.example")?;
+            Pattern::compile("pkg:npm/%40acme/*?repository_url=https:%2F%2Fnpm.acme.example")?;
         assert!(explicit.matches(qualified));
         let all = Pattern::compile("**")?;
         assert!(all.matches(qualified));

@@ -1,8 +1,8 @@
 # Architecture
 
 bomward is a Cargo workspace with two crates. [ADR 0003](adr/0003-rust-workspace.md)
-records that split. Ingest, the model, and the diff are implemented.
-Policy and report are still seams.
+records that split. Ingest, the model, the diff, policy, and the
+report are implemented. The CLI calls that pipeline.
 
 ## Crates
 
@@ -19,8 +19,7 @@ unchecked indexing, `todo!`, and `dbg!` in every target.
 
 ## Modules
 
-`bomward-core` exposes five modules. Ingest, the model, the diff, and
-policy have types and functions. Report is still empty apart from its docs.
+`bomward-core` exposes five modules. Each one has types and functions.
 
 | Module | Responsibility | Work package |
 | --- | --- | --- |
@@ -28,7 +27,7 @@ policy have types and functions. Report is still empty apart from its docs.
 | `model` | Normalized components and identities. | AP1, done |
 | `diff` | Two documents → a typed, deterministic diff. | AP2, done |
 | `policy` | YAML rules → a verdict with reasons. | AP3, done |
-| `report` | Terminal, Markdown, and JSON rendering. | AP4 |
+| `report` | Terminal, Markdown, and JSON rendering. | AP4, done |
 
 Data flow, and the only direction of calls:
 
@@ -45,7 +44,8 @@ files. `ingest` is the only module that interprets CycloneDX JSON.
 `bomward-core` returns `bomward_core::Error`, a `thiserror` enum. Library
 functions do not panic and do not exit the process.
 
-`NotImplemented` remains for report. Policy adds `InvalidPolicy`.
+`NotImplemented` remains so the sentence `not implemented yet` stays
+stable. The report does not return it. Policy adds `InvalidPolicy`.
 Ingest adds I/O, invalid document, unsupported `specVersion`, limit variants, and a
 usage error when `--max-depth` is above 63. The limit variant carries
 the kind (file size, component count, component nesting, or JSON
@@ -54,17 +54,22 @@ ADR 0004 and ADR 0006. The crate is `publish = false` and pre-release,
 so the enum is not a stability promise.
 
 `bomward-cli` converts library errors and usage failures into a message on
-stderr and an exit code. It may use `anyhow`. A usage error, a rejected
-input, and the current not-implemented path all exit 2. A policy
-denial exits 1 once the CLI evaluates a verdict. It does not yet.
-See [ADR 0007](adr/0007-exit-codes-and-determinism.md).
+stderr, prefixed `error: `, and an exit code. It uses `anyhow` for that
+message. Exit 0 is a pass or a report-only run. Exit 1 is an effective
+denial, and the report is written first. Exit 2 is a usage error, a
+file that cannot be read, a rejected SBOM, a limit, a rejected policy,
+or a write error. No report is written on exit 2. A closed stdout pipe
+exits 0 and prints nothing.
+See [ADR 0007](adr/0007-exit-codes-and-determinism.md) and
+[ADR 0016](adr/0016-cli-output.md).
 
 ## CLI
 
-`clap` defines `diff <OLD> <NEW>` with `--policy` and `--format`. The
-handler ignores the parsed values and returns the not-implemented error.
-It does not open the paths. The contract those flags will have is in
-[SPEC.md](SPEC.md).
+`clap` defines `diff <OLD> <NEW>` with `--policy`, `--format`, `--output`,
+and the three limit flags. The handler reads both documents, diffs them,
+optionally evaluates a policy, and renders the report. It contains no
+review rules. The contract is [SPEC.md](SPEC.md) and
+[REPORT.md](REPORT.md).
 
 ## Parser
 
@@ -74,7 +79,7 @@ It does not open the paths. The contract those flags will have is in
 `IgnoredAny` and is not built into a value tree. Component count and
 nesting are checked while reading. [ADR 0009](adr/0009-purl-normalization.md)
 parses package URLs with `packageurl` 0.7.1. Public entry points are
-`read_path` and `read_bytes`. The CLI does not call them yet.
+`read_path` and `read_bytes`. The CLI calls `read_path`.
 
 ## Diff
 
@@ -84,7 +89,7 @@ one-to-one version pairing, and the separate root entry.
 direction. `npm` and `cargo` use `semver` 1.0.28 precedence. Every other
 type, a failed parse, and equal precedence are `unknown`. `diff` takes
 two `&Document` values, cannot fail, and does not read files. The CLI
-does not call it yet.
+calls it after both documents have loaded.
 
 ## Policy
 
@@ -94,15 +99,23 @@ does not call it yet.
 aliases and duplicate keys. License ids are read with `spdx` 0.13.6.
 `read_str`, `read_bytes`, and `read_path` validate the file.
 `evaluate` takes a policy and a diff, cannot fail, and does no I/O.
-The CLI does not call either yet. Exit code 1 is
+The CLI calls both when `--policy` is set. Exit code 1 is
 `Verdict::exit_code` when the effective result is `deny`. A file that
-fails to load is `Error::InvalidPolicy` and will be exit code 2 once
-the CLI is wired.
+fails to load is `Error::InvalidPolicy` and the CLI exits 2.
 
 Each change carries the attributes of the version under review
 (`removed` uses the old version, every other kind the new one). That
 snapshot is not part of the diff's canonical JSON. In-place rows still
 store only the delta there, and a policy matcher needs the version itself.
+
+## Report
+
+[ADR 0015](adr/0015-report-formats-and-escaping.md) is the three formats.
+`render` takes a diff, an optional verdict, and a format, and returns
+one string. Terminal, Markdown, and JSON share one sentence catalog.
+The CLI writes that string and does not assemble a second one.
+[REPORT.md](REPORT.md) is the page operators read. The JSON shape is
+[report.schema.json](report.schema.json).
 
 ## Supply chain of the tool
 

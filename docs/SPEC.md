@@ -106,7 +106,7 @@ and produces a policy verdict a CI job can block on.
 ```text
 bomward --version
 bomward --help
-bomward diff <OLD> <NEW> [--policy <FILE>] [--format <terminal|markdown|json>] [--max-file-bytes N] [--max-components N] [--max-depth N]
+bomward diff <OLD> <NEW> [--policy <FILE>] [--format <terminal|markdown|json>] [--output <FILE>] [--max-file-bytes N] [--max-components N] [--max-depth N]
 ```
 
 | Argument | Meaning |
@@ -115,25 +115,31 @@ bomward diff <OLD> <NEW> [--policy <FILE>] [--format <terminal|markdown|json>] [
 | `NEW` | Candidate CycloneDX JSON file. Required. |
 | `--policy <FILE>` | Policy file. Optional. Omit it for report-only mode. |
 | `--format` | `terminal` (default), `markdown`, or `json`. |
+| `--output <FILE>` | Write the report to this file. Stdout stays empty. The file is created or truncated. Parent directories are not created. A path that is `OLD` or `NEW` is rejected. |
 | `--max-file-bytes` | Max size of one input file. Default `33554432`. |
 | `--max-components` | Max component objects, including nested ones. Default `100000`. |
 | `--max-depth` | Max nesting of `components` inside `components`. Does not limit dependency-graph path length or JSON container depth. Default `32`. Maximum `63`. |
 
 `--version` and `--help` exit 0.
 
-Until the pipeline exists, `diff` prints `not implemented yet` and exits 2.
-It does not read the files. A missing argument is a usage error and also
-exits 2.
-
-When the pipeline exists:
+`diff` reads both SBOMs, diffs them, and renders a report. With
+`--policy` it evaluates that policy first. The report is written to
+stdout, or to `--output` when that flag is set. Diagnostics go to
+stderr and start with `error: `. The message names `OLD`, `NEW`, or
+`policy`, and it repeats the path as it was passed. A `--max-depth`
+above 63 names the flag and does not name a file, because no file is
+opened. A missing argument is a usage error
+and exits 2. No report is written on exit 2.
 
 - If `--policy` is omitted, the run is report-only and exits 0. Terminal,
   Markdown, and JSON include the sentence `No policy was applied.` JSON
   also sets `"policy_applied": false`. The report still lists the changes.
 - If `--policy` is present, that sentence is absent and a denial exits 1.
+  The report is written in full before the process exits 1.
 - `--format terminal` writes plain text. It does not emit ANSI color.
 - `markdown` is the text a pull-request comment can host.
-- `json` is the machine-readable report.
+- `json` is the machine-readable report. The field list is
+  [REPORT.md](REPORT.md).
 
 Human-facing CLI text is English.
 
@@ -143,7 +149,7 @@ Human-facing CLI text is English.
 | --- | --- |
 | 0 | The inputs are valid, and either no policy was applied or the policy allows the change. |
 | 1 | The inputs are valid and the policy denies the change. |
-| 2 | Usage error, rejected input, or a command that is not implemented yet. |
+| 2 | Usage error, a file that cannot be read, a rejected SBOM, a limit, a rejected policy, or a write error. No report is written. |
 
 No other code is used. Details are in [ADR 0007](adr/0007-exit-codes-and-determinism.md).
 

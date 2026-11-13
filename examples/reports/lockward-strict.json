@@ -1,0 +1,554 @@
+{
+  "report_version": 1,
+  "tool": {
+    "name": "bomward",
+    "version": "0.1.0"
+  },
+  "policy_applied": true,
+  "notice": null,
+  "gate": {
+    "mode": "enforce",
+    "configured": "deny",
+    "effective": "deny",
+    "weakened_denials": 0,
+    "exit_code": 1
+  },
+  "counts": {
+    "decisions": {
+      "deny": 1,
+      "warn": 8,
+      "allow": 0
+    },
+    "changes": {
+      "added": 3,
+      "removed": 1,
+      "version-changed": 2,
+      "license-changed": 1,
+      "supplier-changed": 0,
+      "hash-changed": 0,
+      "hash-coverage-changed": 0,
+      "scope-changed": 1,
+      "role-changed": 1
+    }
+  },
+  "units": [
+    {
+      "subject": "change",
+      "purl": "pkg:npm/rolled",
+      "ecosystem": "npm",
+      "namespace": null,
+      "name": "rolled",
+      "group": null,
+      "qualifiers": {},
+      "subpath": null,
+      "version": "1.0.0",
+      "epoch": null,
+      "kind": "version-changed",
+      "condition": null,
+      "role": "direct",
+      "configured": "deny",
+      "effective": "deny",
+      "rules": [
+        "no-downgrade"
+      ],
+      "used_default": false,
+      "message": "Version changed from 2.0.0 to 1.0.0 (downgrade).",
+      "detail": {
+        "kind": "version-changed",
+        "direction": "downgrade",
+        "flags": [],
+        "old_version": "2.0.0",
+        "old_epoch": null,
+        "new_version": "1.0.0",
+        "new_epoch": null,
+        "old_attributes": {
+          "licenses": [
+            "MIT"
+          ],
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "abcd"
+            }
+          ],
+          "suppliers": [],
+          "scopes": [
+            "required"
+          ],
+          "types": [
+            "library"
+          ]
+        },
+        "new_attributes": {
+          "licenses": [
+            "MIT"
+          ],
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "abcd"
+            }
+          ],
+          "suppliers": [],
+          "scopes": [
+            "required"
+          ],
+          "types": [
+            "library"
+          ]
+        }
+      }
+    },
+    {
+      "subject": "change",
+      "purl": "pkg:npm/bumped",
+      "ecosystem": "npm",
+      "namespace": null,
+      "name": "bumped",
+      "group": null,
+      "qualifiers": {},
+      "subpath": null,
+      "version": "1.1.0",
+      "epoch": null,
+      "kind": "version-changed",
+      "condition": null,
+      "role": "direct",
+      "configured": "warn",
+      "effective": "warn",
+      "rules": [],
+      "used_default": true,
+      "message": "Version changed from 1.0.0 to 1.1.0 (upgrade).",
+      "detail": {
+        "kind": "version-changed",
+        "direction": "upgrade",
+        "flags": [],
+        "old_version": "1.0.0",
+        "old_epoch": null,
+        "new_version": "1.1.0",
+        "new_epoch": null,
+        "old_attributes": {
+          "licenses": [
+            "MIT"
+          ],
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "abcd"
+            }
+          ],
+          "suppliers": [],
+          "scopes": [
+            "required"
+          ],
+          "types": [
+            "library"
+          ]
+        },
+        "new_attributes": {
+          "licenses": [
+            "MIT"
+          ],
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "abcd"
+            }
+          ],
+          "suppliers": [],
+          "scopes": [
+            "required"
+          ],
+          "types": [
+            "library"
+          ]
+        }
+      }
+    },
+    {
+      "subject": "change",
+      "purl": "pkg:npm/devkit",
+      "ecosystem": "npm",
+      "namespace": null,
+      "name": "devkit",
+      "group": null,
+      "qualifiers": {},
+      "subpath": null,
+      "version": "1.0.0",
+      "epoch": null,
+      "kind": "scope-changed",
+      "condition": null,
+      "role": "direct",
+      "configured": "warn",
+      "effective": "warn",
+      "rules": [
+        "scope-becomes-required"
+      ],
+      "used_default": false,
+      "message": "Scopes added: required. Removed: excluded.",
+      "detail": {
+        "kind": "scope-changed",
+        "added": [
+          "required"
+        ],
+        "removed": [
+          "excluded"
+        ]
+      }
+    },
+    {
+      "subject": "change",
+      "purl": "pkg:npm/fresh",
+      "ecosystem": "npm",
+      "namespace": null,
+      "name": "fresh",
+      "group": null,
+      "qualifiers": {},
+      "subpath": null,
+      "version": "1.0.0",
+      "epoch": null,
+      "kind": "added",
+      "condition": null,
+      "role": "direct",
+      "configured": "warn",
+      "effective": "warn",
+      "rules": [
+        "new-direct"
+      ],
+      "used_default": false,
+      "message": "Added. Introduced by npm review-app@1.0.0. Path from the root: npm review-app@1.0.0, npm fresh@1.0.0. Licenses: MIT. Suppliers: none. Scopes: required. Hash algorithms: SHA-256. Hash contents: abcd.",
+      "detail": {
+        "kind": "added",
+        "introduced_by": {
+          "shown": [
+            {
+              "purl": "pkg:npm/review-app",
+              "ecosystem": "npm",
+              "namespace": null,
+              "name": "review-app",
+              "group": null,
+              "version": "1.0.0",
+              "epoch": null
+            }
+          ],
+          "total": 1
+        },
+        "path_from_root": {
+          "shown": [
+            {
+              "purl": "pkg:npm/review-app",
+              "ecosystem": "npm",
+              "namespace": null,
+              "name": "review-app",
+              "group": null,
+              "version": "1.0.0",
+              "epoch": null
+            },
+            {
+              "purl": "pkg:npm/fresh",
+              "ecosystem": "npm",
+              "namespace": null,
+              "name": "fresh",
+              "group": null,
+              "version": "1.0.0",
+              "epoch": null
+            }
+          ],
+          "total": 2
+        },
+        "attributes": {
+          "licenses": [
+            "MIT"
+          ],
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "abcd"
+            }
+          ],
+          "suppliers": [],
+          "scopes": [
+            "required"
+          ],
+          "types": [
+            "library"
+          ]
+        }
+      }
+    },
+    {
+      "subject": "change",
+      "purl": "pkg:npm/gone",
+      "ecosystem": "npm",
+      "namespace": null,
+      "name": "gone",
+      "group": null,
+      "qualifiers": {},
+      "subpath": null,
+      "version": "1.0.0",
+      "epoch": null,
+      "kind": "removed",
+      "condition": null,
+      "role": "direct",
+      "configured": "warn",
+      "effective": "warn",
+      "rules": [],
+      "used_default": true,
+      "message": "Removed. Licenses: MIT. Suppliers: none. Scopes: required. Hash algorithms: SHA-256. Hash contents: abcd.",
+      "detail": {
+        "kind": "removed",
+        "attributes": {
+          "licenses": [
+            "MIT"
+          ],
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "abcd"
+            }
+          ],
+          "suppliers": [],
+          "scopes": [
+            "required"
+          ],
+          "types": [
+            "library"
+          ]
+        }
+      }
+    },
+    {
+      "subject": "change",
+      "purl": "pkg:npm/licensed",
+      "ecosystem": "npm",
+      "namespace": null,
+      "name": "licensed",
+      "group": null,
+      "qualifiers": {},
+      "subpath": null,
+      "version": "1.0.0",
+      "epoch": null,
+      "kind": "license-changed",
+      "condition": null,
+      "role": "direct",
+      "configured": "warn",
+      "effective": "warn",
+      "rules": [],
+      "used_default": true,
+      "message": "Licenses added: Apache-2.0. Removed: MIT.",
+      "detail": {
+        "kind": "license-changed",
+        "added": [
+          "Apache-2.0"
+        ],
+        "removed": [
+          "MIT"
+        ]
+      }
+    },
+    {
+      "subject": "change",
+      "purl": "pkg:npm/multi",
+      "ecosystem": "npm",
+      "namespace": null,
+      "name": "multi",
+      "group": null,
+      "qualifiers": {},
+      "subpath": null,
+      "version": "3.0.0",
+      "epoch": null,
+      "kind": "added",
+      "condition": null,
+      "role": "transitive",
+      "configured": "warn",
+      "effective": "warn",
+      "rules": [],
+      "used_default": true,
+      "message": "Added. Introduced by npm fresh@1.0.0. Path from the root: npm review-app@1.0.0, npm fresh@1.0.0, npm multi@3.0.0. Licenses: MIT. Suppliers: none. Scopes: required. Hash algorithms: SHA-256. Hash contents: abcd.",
+      "detail": {
+        "kind": "added",
+        "introduced_by": {
+          "shown": [
+            {
+              "purl": "pkg:npm/fresh",
+              "ecosystem": "npm",
+              "namespace": null,
+              "name": "fresh",
+              "group": null,
+              "version": "1.0.0",
+              "epoch": null
+            }
+          ],
+          "total": 1
+        },
+        "path_from_root": {
+          "shown": [
+            {
+              "purl": "pkg:npm/review-app",
+              "ecosystem": "npm",
+              "namespace": null,
+              "name": "review-app",
+              "group": null,
+              "version": "1.0.0",
+              "epoch": null
+            },
+            {
+              "purl": "pkg:npm/fresh",
+              "ecosystem": "npm",
+              "namespace": null,
+              "name": "fresh",
+              "group": null,
+              "version": "1.0.0",
+              "epoch": null
+            },
+            {
+              "purl": "pkg:npm/multi",
+              "ecosystem": "npm",
+              "namespace": null,
+              "name": "multi",
+              "group": null,
+              "version": "3.0.0",
+              "epoch": null
+            }
+          ],
+          "total": 3
+        },
+        "attributes": {
+          "licenses": [
+            "MIT"
+          ],
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "abcd"
+            }
+          ],
+          "suppliers": [],
+          "scopes": [
+            "required"
+          ],
+          "types": [
+            "library"
+          ]
+        }
+      }
+    },
+    {
+      "subject": "change",
+      "purl": "pkg:npm/nested-new",
+      "ecosystem": "npm",
+      "namespace": null,
+      "name": "nested-new",
+      "group": null,
+      "qualifiers": {},
+      "subpath": null,
+      "version": "1.0.0",
+      "epoch": null,
+      "kind": "added",
+      "condition": null,
+      "role": "transitive",
+      "configured": "warn",
+      "effective": "warn",
+      "rules": [],
+      "used_default": true,
+      "message": "Added. Introduced by npm fresh@1.0.0. Path from the root: npm review-app@1.0.0, npm fresh@1.0.0, npm nested-new@1.0.0. Licenses: MIT. Suppliers: none. Scopes: required. Hash algorithms: SHA-256. Hash contents: abcd.",
+      "detail": {
+        "kind": "added",
+        "introduced_by": {
+          "shown": [
+            {
+              "purl": "pkg:npm/fresh",
+              "ecosystem": "npm",
+              "namespace": null,
+              "name": "fresh",
+              "group": null,
+              "version": "1.0.0",
+              "epoch": null
+            }
+          ],
+          "total": 1
+        },
+        "path_from_root": {
+          "shown": [
+            {
+              "purl": "pkg:npm/review-app",
+              "ecosystem": "npm",
+              "namespace": null,
+              "name": "review-app",
+              "group": null,
+              "version": "1.0.0",
+              "epoch": null
+            },
+            {
+              "purl": "pkg:npm/fresh",
+              "ecosystem": "npm",
+              "namespace": null,
+              "name": "fresh",
+              "group": null,
+              "version": "1.0.0",
+              "epoch": null
+            },
+            {
+              "purl": "pkg:npm/nested-new",
+              "ecosystem": "npm",
+              "namespace": null,
+              "name": "nested-new",
+              "group": null,
+              "version": "1.0.0",
+              "epoch": null
+            }
+          ],
+          "total": 3
+        },
+        "attributes": {
+          "licenses": [
+            "MIT"
+          ],
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "abcd"
+            }
+          ],
+          "suppliers": [],
+          "scopes": [
+            "required"
+          ],
+          "types": [
+            "library"
+          ]
+        }
+      }
+    },
+    {
+      "subject": "change",
+      "purl": "pkg:npm/promoted",
+      "ecosystem": "npm",
+      "namespace": null,
+      "name": "promoted",
+      "group": null,
+      "qualifiers": {},
+      "subpath": null,
+      "version": "1.0.0",
+      "epoch": null,
+      "kind": "role-changed",
+      "condition": null,
+      "role": "direct",
+      "configured": "warn",
+      "effective": "warn",
+      "rules": [],
+      "used_default": true,
+      "message": "Role changed from transitive to direct.",
+      "detail": {
+        "kind": "role-changed",
+        "old_role": "transitive",
+        "new_role": "direct"
+      }
+    }
+  ],
+  "root": null,
+  "roles_comparable": true,
+  "warnings": {
+    "old": [],
+    "new": []
+  }
+}

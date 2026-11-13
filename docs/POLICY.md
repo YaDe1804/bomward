@@ -198,11 +198,11 @@ is also an error.
 subpath matches only a pattern that names them. Qualifiers are written in
 the canonical form the key stores: lowercase keys, sorted, values
 percent-encoded. Namespace `@acme`, name `tool`, and qualifier
-`repository_url` = `https://evil.example` are stored, and written as a
+`repository_url` = `https://npm.acme.example` are stored, and written as a
 pattern, like this:
 
 ```text
-pkg:npm/%40acme/tool?repository_url=https:%2F%2Fevil.example
+pkg:npm/%40acme/tool?repository_url=https:%2F%2Fnpm.acme.example
 ```
 
 `/` in the value is `%2F`. A pattern whose qualifier text is not that
@@ -210,7 +210,7 @@ form is an error, and the message shows the canonical spelling. That
 includes a raw `https://`, keys that are not sorted (`b=1&a=2` is
 `a=2&b=1`), and an empty section after `?`. An empty subpath after `#`
 is an error. `pkg:npm/%40acme/*` does not match the URL above.
-`pkg:npm/%40acme/*?repository_url=https:%2F%2Fevil.example` does, because
+`pkg:npm/%40acme/*?repository_url=https:%2F%2Fnpm.acme.example` does, because
 the qualifier text is the canonical one.
 
 The exact pattern `**` still matches every key, including one with

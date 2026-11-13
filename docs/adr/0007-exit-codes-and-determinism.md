@@ -1,6 +1,6 @@
 # ADR 0007 — Exit codes and determinism
 
-- Status: accepted
+- Status: accepted, amended by [ADR 0016](0016-cli-output.md)
 - Date: 2026-11-11
 
 ## Context
@@ -32,9 +32,11 @@ absent and `"policy_applied"` is `true`.
 Warnings, including an invalid `purl` (ADR 0005), do not change the exit
 code. They are part of the report.
 
-The foundation `diff` command is not implemented, so it exits 2 even
-when the arguments are present. Report-only mode starts when the
-pipeline exists.
+The foundation build exited 2 because `diff` was not implemented.
+[ADR 0016](0016-cli-output.md) is the current command: a finished report
+exits 0 or 1, and exit 2 means no report was written. A reader that
+closes stdout early does not change that code and does not print a
+diagnostic.
 
 Determinism:
 
