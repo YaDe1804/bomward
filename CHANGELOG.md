@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Fuzzing for the decoder and the policy parser. A deterministic smoke
+  fuzz runs in the stable test suite, and libFuzzer targets live in
+  `fuzz/` with a committed seed corpus. Boundary tests lock component
+  depth 32/33, JSON depth 127/128, dependency cycles, and a 100,000-hash
+  component under the file-size limit. See [docs/FUZZING.md](docs/FUZZING.md)
+  and [ADR 0018](docs/adr/0018-fuzzing-and-attribute-amplification.md).
 - GitHub Action `bomward review`. It diffs the pull-request SBOM against
   the baseline from the base commit, reads the policy from that same
   commit, and posts or updates one pull-request comment. The release
