@@ -2,11 +2,11 @@
 
 ## Supported versions
 
-bomward is pre-release. No version is supported for production use.
+Security fixes land on the latest 0.1.x release.
 
 | Version | Supported |
 | --- | --- |
-| nothing released yet | no production support |
+| 0.1.x | yes |
 
 ## Reporting a vulnerability
 
