@@ -72,7 +72,7 @@ runs:
         fi
         scripts="${action_root}/.github/actions/bomward/scripts"
 
-        eval "$("${scripts}/resolve-inputs.sh")"
+        eval "$(bash "${scripts}/resolve-inputs.sh")"
         export BOMWARD_BASE_SHA BOMWARD_HEAD_SHA BOMWARD_PR_NUMBER
         export BOMWARD_SBOM_PATH BOMWARD_OLD_SBOM_PATH BOMWARD_POLICY_PATH
 
@@ -81,18 +81,18 @@ runs:
 
         export BOMWARD_REPO_PATH="$BOMWARD_OLD_SBOM_PATH"
         export BOMWARD_DEST="${work}/old-sbom"
-        eval "$("${scripts}/fetch-from-base.sh")"
+        eval "$(bash "${scripts}/fetch-from-base.sh")"
         old="$BOMWARD_FETCHED"
 
         policy_file=""
         if [ -n "$BOMWARD_POLICY_PATH" ]; then
           export BOMWARD_REPO_PATH="$BOMWARD_POLICY_PATH"
           export BOMWARD_DEST="${work}/policy"
-          eval "$("${scripts}/fetch-from-base.sh")"
+          eval "$(bash "${scripts}/fetch-from-base.sh")"
           policy_file="$BOMWARD_FETCHED"
         fi
 
-        eval "$("${scripts}/install-bomward.sh")"
+        eval "$(bash "${scripts}/install-bomward.sh")"
         export BOMWARD_BIN
 
         export BOMWARD_OLD="$old"
@@ -101,7 +101,7 @@ runs:
         export BOMWARD_OUT_DIR="${work}/out"
 
         set +e
-        gate_out=$("${scripts}/run-gate.sh")
+        gate_out=$(bash "${scripts}/run-gate.sh")
         verdict=$?
         set -e
 
@@ -116,7 +116,7 @@ runs:
         if [ "$BOMWARD_COMMENT" = "true" ]; then
           export BOMWARD_BODY_FILE="$BOMWARD_MARKDOWN"
           export BOMWARD_PR="$BOMWARD_PR_NUMBER"
-          "${scripts}/upsert-comment.sh"
+          bash "${scripts}/upsert-comment.sh"
         fi
         if [ -n "${GITHUB_OUTPUT:-}" ]; then
           printf 'exit-code=%s\n' "$verdict" >>"$GITHUB_OUTPUT"
