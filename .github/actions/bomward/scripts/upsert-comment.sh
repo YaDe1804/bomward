@@ -11,7 +11,11 @@
 set -euo pipefail
 
 marker=${BOMWARD_MARKER:-<!-- bomward-review -->}
-body_file=${BOMWARD_BODY_FILE:?}
+if [ -z "${BOMWARD_BODY_FILE:-}" ]; then
+  echo "error: BOMWARD_BODY_FILE is required" >&2
+  exit 2
+fi
+body_file=$BOMWARD_BODY_FILE
 body=$(cat "$body_file")
 case "$body" in
   *"$marker"*) payload=$body ;;
@@ -58,7 +62,11 @@ if [ -z "$pr" ]; then
   write_summary
   exit 0
 fi
-repository=${GITHUB_REPOSITORY:?}
+if [ -z "${GITHUB_REPOSITORY:-}" ]; then
+  echo "error: GITHUB_REPOSITORY is required" >&2
+  exit 2
+fi
+repository=$GITHUB_REPOSITORY
 err_file=$(mktemp)
 
 set +e

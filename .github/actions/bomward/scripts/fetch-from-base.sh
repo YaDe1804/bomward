@@ -9,9 +9,13 @@
 # left untouched in that case.
 set -euo pipefail
 
-base=${BOMWARD_BASE_SHA:?}
-path=${BOMWARD_REPO_PATH:?}
-dest=${BOMWARD_DEST:?}
+if [ -z "${BOMWARD_BASE_SHA:-}" ] || [ -z "${BOMWARD_REPO_PATH:-}" ] || [ -z "${BOMWARD_DEST:-}" ]; then
+  echo "error: BOMWARD_BASE_SHA, BOMWARD_REPO_PATH, and BOMWARD_DEST are required" >&2
+  exit 2
+fi
+base=$BOMWARD_BASE_SHA
+path=$BOMWARD_REPO_PATH
+dest=$BOMWARD_DEST
 
 if ! git rev-parse --verify "${base}^{commit}" >/dev/null 2>&1; then
   if git rev-parse --verify "origin/${base}^{commit}" >/dev/null 2>&1; then

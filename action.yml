@@ -73,6 +73,8 @@ runs:
         scripts="${action_root}/.github/actions/bomward/scripts"
 
         eval "$("${scripts}/resolve-inputs.sh")"
+        export BOMWARD_BASE_SHA BOMWARD_HEAD_SHA BOMWARD_PR_NUMBER
+        export BOMWARD_SBOM_PATH BOMWARD_OLD_SBOM_PATH BOMWARD_POLICY_PATH
 
         work="${RUNNER_TEMP:-/tmp}/bomward-${GITHUB_JOB:-local}"
         mkdir -p "$work"
@@ -91,6 +93,7 @@ runs:
         fi
 
         eval "$("${scripts}/install-bomward.sh")"
+        export BOMWARD_BIN
 
         export BOMWARD_OLD="$old"
         export BOMWARD_NEW="$BOMWARD_SBOM_PATH"

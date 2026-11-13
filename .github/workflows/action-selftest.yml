@@ -1,0 +1,62 @@
+name: Action self-test
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: action-selftest-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deny:
+    name: deny
+    runs-on: ubuntu-latest
+    env:
+      BOMWARD_USE_LOCAL: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+      - name: Review with the strict policy
+        uses: ./
+        with:
+          sbom: bomward-core/tests/fixtures/lockward-new.cdx.json
+          old-sbom: bomward-core/tests/fixtures/lockward-old.cdx.json
+          policy: examples/policies/strict.yaml
+          comment: "false"
+          fail-on-deny: "false"
+      - name: The report denies
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F -q "Result: Deny" "$GITHUB_STEP_SUMMARY"
+
+  report-only:
+    name: report-only
+    runs-on: ubuntu-latest
+    env:
+      BOMWARD_USE_LOCAL: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+      - name: Review without a policy
+        uses: ./
+        with:
+          sbom: bomward-core/tests/fixtures/lockward-new.cdx.json
+          old-sbom: bomward-core/tests/fixtures/lockward-old.cdx.json
+          comment: "false"
+      - name: The report does not judge
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F -q "No policy was applied." "$GITHUB_STEP_SUMMARY"

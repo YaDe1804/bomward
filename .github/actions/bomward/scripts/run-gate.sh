@@ -10,10 +10,14 @@
 # Stdout: BOMWARD_EXIT, BOMWARD_MARKDOWN, BOMWARD_TERMINAL, BOMWARD_JSON
 set -euo pipefail
 
-bin=${BOMWARD_BIN:?}
-old=${BOMWARD_OLD:?}
-new=${BOMWARD_NEW:?}
-out=${BOMWARD_OUT_DIR:?}
+if [ -z "${BOMWARD_BIN:-}" ] || [ -z "${BOMWARD_OLD:-}" ] || [ -z "${BOMWARD_NEW:-}" ] || [ -z "${BOMWARD_OUT_DIR:-}" ]; then
+  echo "error: BOMWARD_BIN, BOMWARD_OLD, BOMWARD_NEW, and BOMWARD_OUT_DIR are required" >&2
+  exit 2
+fi
+bin=$BOMWARD_BIN
+old=$BOMWARD_OLD
+new=$BOMWARD_NEW
+out=$BOMWARD_OUT_DIR
 mkdir -p "$out"
 
 args=("$bin" diff "$old" "$new")

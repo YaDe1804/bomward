@@ -5,7 +5,8 @@
 # binary is made executable. The binary is not started.
 #
 # Inputs: BOMWARD_VERSION, BOMWARD_REPOSITORY, RUNNER_OS,
-#         BOMWARD_RELEASE_DIR (local asset directory, skips the download)
+#         BOMWARD_RELEASE_DIR (local asset directory, skips the download),
+#         BOMWARD_USE_LOCAL (1 builds this repo and skips the download)
 # Stdout: BOMWARD_BIN=<path>
 # Exit 2 when the checksum does not match.
 set -euo pipefail
@@ -46,6 +47,34 @@ if [ -z "${RUNNER_OS:-}" ]; then
       ;;
   esac
 fi
+
+if [ "${BOMWARD_USE_LOCAL:-}" = "1" ]; then
+  case "${RUNNER_OS}" in
+    Windows) bin="bomward.exe" ;;
+    Linux | macOS) bin="bomward" ;;
+    *)
+      echo "error: unsupported runner OS ${RUNNER_OS}" >&2
+      exit 2
+      ;;
+  esac
+  root=${BOMWARD_LOCAL_ROOT:-${GITHUB_ACTION_PATH:-}}
+  if [ -z "$root" ]; then
+    root="."
+  fi
+  if command -v cygpath >/dev/null 2>&1; then
+    root=$(cygpath -u "$root")
+  fi
+  (cd "$root" && cargo build --release --locked >/dev/null)
+  found="${root}/target/release/${bin}"
+  if [ ! -f "$found" ]; then
+    echo "error: local build did not produce ${bin}" >&2
+    exit 2
+  fi
+  chmod +x "$found" 2>/dev/null || true
+  printf 'BOMWARD_BIN=%q\n' "$found"
+  exit 0
+fi
+
 select_asset
 
 if [ -n "${BOMWARD_RELEASE_DIR:-}" ]; then
