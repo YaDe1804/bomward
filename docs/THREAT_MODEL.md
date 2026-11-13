@@ -105,6 +105,27 @@ Duplicate versions are a warning. Wildcard requirements are denied.
 Dependabot tracks `cargo` and `github-actions`. The dependency set stays
 small; each new crate is justified in the commit that adds it.
 
+## Fuzzing
+
+The decoder (`read_bytes`) and the policy parser (`policy::read_bytes`)
+are fuzzed. A deterministic smoke fuzz in the stable test suite feeds
+structured documents, raw bytes, and policy-shaped bytes, then diffs a
+parsed document and renders all three report formats. libFuzzer targets
+`decode` and `policy` run in CI from the committed seed corpus. The
+procedure is [FUZZING.md](FUZZING.md). The decision is
+[ADR 0018](adr/0018-fuzzing-and-attribute-amplification.md).
+
+The search is for panics, hangs, and memory amplification. It does not
+judge whether two visible characters can be confused. Homoglyphs and
+other visible lookalikes stay out of scope: the report encodes invisible
+characters, and it does not fold lookalike letters into one another.
+
+A component may carry a very large attribute set, in particular
+`hashes`. There is no separate cap for that. The 32 MiB file-size limit
+is the bound. A measured 31 MiB input with 200,000 hashes stayed near
+35 MiB of resident memory. The regression test accepts 100,000 hashes
+and rejects the input once it passes the file-size limit.
+
 ## Out of scope
 
 - Whether a listed package is malware, vulnerable, or typosquatted.

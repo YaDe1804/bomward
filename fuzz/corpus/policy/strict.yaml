@@ -1,0 +1,76 @@
+# The recommended rules, enforced. Anything a rule does not mention warns.
+# A missing dependency graph, or a duplicate key in the new SBOM, fails the run.
+version: 1
+mode: enforce
+default: warn
+rules:
+  - id: no-downgrade
+    description: A downgrade needs a person to look at it before it lands.
+    when:
+      change: [version-changed]
+      direction: [downgrade]
+    decision: deny
+
+  - id: no-hash-contradiction
+    description: One algorithm must not carry two different contents.
+    when:
+      change: [hash-changed]
+    decision: deny
+
+  - id: no-dropped-hash
+    description: Removing a hash algorithm drops a check the old document had.
+    when:
+      change: [hash-coverage-changed]
+      coverage: [algorithm-removed, all-dropped]
+    decision: deny
+
+  - id: no-strong-copyleft
+    description: >
+      A new dependency, or a license string that newly offers GPL or AGPL,
+      fails the run. -or-later ids are listed with the deprecated forms.
+    when:
+      change: [added, license-changed]
+      license:
+        - AGPL-3.0
+        - AGPL-3.0-only
+        - AGPL-3.0-or-later
+        - GPL-2.0
+        - GPL-2.0-only
+        - GPL-2.0-or-later
+        - GPL-3.0
+        - GPL-3.0-only
+        - GPL-3.0-or-later
+    decision: deny
+
+  - id: scope-becomes-required
+    description: An excluded or optional dependency became a runtime dependency.
+    when:
+      change: [scope-changed]
+      scope: [required]
+    decision: warn
+
+  - id: unrecognized-license
+    description: A license string that is neither an SPDX id nor an SPDX expression.
+    when:
+      change: [added, license-changed, version-changed]
+      license_status: [unrecognized]
+    decision: warn
+
+  - id: new-direct
+    description: A new direct dependency warns.
+    when:
+      change: [added]
+      role: [direct]
+    decision: warn
+
+  - id: require-graph
+    description: Without a graph, direct and transitive are guesses.
+    when:
+      document: [graph-unavailable]
+    decision: deny
+
+  - id: no-duplicate-key
+    description: A repeated JSON key means the SBOM is not the document it looks like.
+    when:
+      document: [duplicate-key]
+    decision: deny

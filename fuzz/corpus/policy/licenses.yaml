@@ -1,0 +1,27 @@
+# License rules only. The package exception uses the canonical purl
+# spelling: @ in an npm scope is %40. pkg:npm/@acme/internal would not match.
+version: 1
+mode: enforce
+default: allow
+rules:
+  - id: no-strong-copyleft
+    description: GPL or AGPL fails, except one internal package.
+    when:
+      change: [added, version-changed, license-changed]
+      license:
+        - AGPL-3.0
+        - AGPL-3.0-only
+        - GPL-2.0
+        - GPL-2.0-only
+        - GPL-3.0
+        - GPL-3.0-only
+    unless:
+      - "pkg:npm/%40acme/internal"
+    decision: deny
+
+  - id: notice-apache
+    description: A newly arrived Apache-2.0 license is recorded, not blocked.
+    when:
+      change: [license-changed]
+      license: [Apache-2.0]
+    decision: warn
