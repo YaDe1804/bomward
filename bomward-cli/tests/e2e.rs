@@ -257,13 +257,7 @@ fn limit_policy_and_write(
     minimal_text: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let output = bomward()
-        .args([
-            "diff",
-            minimal_text,
-            minimal_text,
-            "--max-components",
-            "0",
-        ])
+        .args(["diff", minimal_text, minimal_text, "--max-components", "0"])
         .output()?;
     let stderr = String::from_utf8(output.stderr)?;
     assert!(
@@ -304,13 +298,7 @@ fn limit_policy_and_write(
     )?;
     let policy_text = display(&policy);
     let output = bomward()
-        .args([
-            "diff",
-            minimal_text,
-            minimal_text,
-            "--policy",
-            &policy_text,
-        ])
+        .args(["diff", minimal_text, minimal_text, "--policy", &policy_text])
         .output()?;
     let stderr = String::from_utf8(output.stderr)?;
     assert_eq!(output.status.code(), Some(2), "{stderr}");
@@ -322,13 +310,7 @@ fn limit_policy_and_write(
     let nested = dir.join("missing-parent").join("out.txt");
     let nested_text = display(&nested);
     let output = bomward()
-        .args([
-            "diff",
-            minimal_text,
-            minimal_text,
-            "--output",
-            &nested_text,
-        ])
+        .args(["diff", minimal_text, minimal_text, "--output", &nested_text])
         .output()?;
     let stderr = String::from_utf8(output.stderr)?;
     assert_eq!(output.status.code(), Some(2), "{stderr}");

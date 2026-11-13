@@ -13,11 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fields, duplicate keys, and aliases, and evaluates a diff into a
   verdict. `mode: warn` turns `deny` into `warn`. Exit code 1 is
   `Verdict::exit_code` when the effective result is `deny`. The CLI
-  does not call this yet. See [docs/POLICY.md](docs/POLICY.md) and
-  ADRs 0013 and 0014. Example files live in `examples/policies/`.
+  calls this when `--policy` is set. See [docs/POLICY.md](docs/POLICY.md)
+  and ADRs 0013 and 0014. Example files live in `examples/policies/`.
+- `bomward diff` reads both CycloneDX documents, optionally applies a
+  policy, and writes a terminal, Markdown, or JSON report. `--output`
+  writes that report to a file. Exit 0 is a pass or report-only, exit 1
+  is an effective denial, and exit 2 is any failure before a verdict.
+  See [docs/REPORT.md](docs/REPORT.md) and ADRs 0015 and 0016.
+  Example reports live in `examples/reports/`.
 - Repository foundation: public docs, ADRs 0001–0007, and the Cargo workspace.
-- `bomward` parses `diff <OLD> <NEW>` with `--policy` and `--format`, then
-  exits 2 with `not implemented yet`. It does not review SBOMs yet.
+- `bomward` parses `diff <OLD> <NEW>` with `--policy`, `--format`,
+  `--output`, and the limit flags.
 - A component `version` that differs from its purl version warns
   `version-mismatch`. The stored version is the purl version.
 - A repeated key in a JSON object warns `duplicate-key`. The last value

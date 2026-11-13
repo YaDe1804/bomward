@@ -54,6 +54,8 @@ The foundation closure is:
 | `clap` | 4.6.7 | `bomward-cli` | Command and flag parsing (`derive`). |
 | `noyalib` | 0.0.60 | `bomward-core` | Policy YAML. Exact pin `=0.0.60`. See ADR 0014. |
 | `spdx` | 0.13.6 | `bomward-core` | SPDX license ids inside policy expressions. Default features. |
+| `comrak` | 0.59.0 | `bomward-core` dev | Parses Markdown reports in tests. Default features off. |
+| `jsonschema` | 0.61.2 | `bomward-core` dev | Validates report JSON against `docs/report.schema.json`. Default features off. |
 
 `bomward-cli` also depends on `bomward-core` by path. Versions are locked in
 `Cargo.lock`. Add a crate with `cargo add` and update this table in the same
@@ -67,8 +69,9 @@ cargo run -p bomward-cli -- --help
 cargo run -p bomward-cli -- diff old.json new.json
 ```
 
-The last command prints `not implemented yet` and exits 2. It does not
-read `old.json` or `new.json`.
+The last command reads `old.json` and `new.json`. A missing file exits 2
+and names which argument failed. A pair of CycloneDX documents exits 0
+when no policy is passed.
 
 ## Quality gate
 
