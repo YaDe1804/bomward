@@ -1,0 +1,64 @@
+# Starting policy. mode warn turns every deny into a warning, so the
+# exit code stays 0 until you switch the file to enforce.
+version: 1
+mode: warn
+default: allow
+rules:
+  - id: no-downgrade
+    description: A downgrade needs a person to look at it before it lands.
+    when:
+      change: [version-changed]
+      direction: [downgrade]
+    decision: deny
+
+  - id: no-hash-contradiction
+    description: One algorithm must not carry two different contents.
+    when:
+      change: [hash-changed]
+    decision: deny
+
+  - id: no-dropped-hash
+    description: Removing a hash algorithm drops a check the old document had.
+    when:
+      change: [hash-coverage-changed]
+      coverage: [algorithm-removed, all-dropped]
+    decision: deny
+
+  - id: no-strong-copyleft
+    description: >
+      A new dependency, or a license string that newly offers GPL or AGPL,
+      needs a review. -or-later ids are listed with the deprecated forms.
+    when:
+      change: [added, license-changed]
+      license:
+        - AGPL-3.0
+        - AGPL-3.0-only
+        - AGPL-3.0-or-later
+        - GPL-2.0
+        - GPL-2.0-only
+        - GPL-2.0-or-later
+        - GPL-3.0
+        - GPL-3.0-only
+        - GPL-3.0-or-later
+    decision: deny
+
+  - id: scope-becomes-required
+    description: An excluded or optional dependency became a runtime dependency.
+    when:
+      change: [scope-changed]
+      scope: [required]
+    decision: warn
+
+  - id: unrecognized-license
+    description: A license string that is neither an SPDX id nor an SPDX expression.
+    when:
+      change: [added, license-changed, version-changed]
+      license_status: [unrecognized]
+    decision: warn
+
+  - id: new-direct
+    description: A new direct dependency is worth seeing. It does not fail the run.
+    when:
+      change: [added]
+      role: [direct]
+    decision: warn

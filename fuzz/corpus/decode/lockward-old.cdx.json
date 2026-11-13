@@ -1,0 +1,395 @@
+{
+  "bomFormat": "CycloneDX",
+  "components": [
+    {
+      "bom-ref": "pkg:npm/%40scope/left-pad@1.2.0",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "abcd"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "name": "@scope/left-pad",
+      "purl": "pkg:npm/%40scope/left-pad@1.2.0",
+      "scope": "required",
+      "type": "library",
+      "version": "1.2.0"
+    },
+    {
+      "bom-ref": "pkg:npm/ansi-regex@5.0.1",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "abcd"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "name": "ansi-regex",
+      "properties": [
+        {
+          "name": "lockward:dev",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:npm/ansi-regex@5.0.1",
+      "scope": "excluded",
+      "type": "library",
+      "version": "5.0.1"
+    },
+    {
+      "bom-ref": "pkg:npm/bumped@1.0.0",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "abcd"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "name": "bumped",
+      "purl": "pkg:npm/bumped@1.0.0",
+      "scope": "required",
+      "type": "library",
+      "version": "1.0.0"
+    },
+    {
+      "bom-ref": "pkg:npm/carrier@1.0.0",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "abcd"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "name": "carrier",
+      "purl": "pkg:npm/carrier@1.0.0",
+      "scope": "required",
+      "type": "library",
+      "version": "1.0.0"
+    },
+    {
+      "bom-ref": "pkg:npm/cycle-a@1.0.0",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "abcd"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "name": "cycle-a",
+      "purl": "pkg:npm/cycle-a@1.0.0",
+      "scope": "required",
+      "type": "library",
+      "version": "1.0.0"
+    },
+    {
+      "bom-ref": "pkg:npm/cycle-b@1.0.0",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "abcd"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "name": "cycle-b",
+      "purl": "pkg:npm/cycle-b@1.0.0",
+      "scope": "required",
+      "type": "library",
+      "version": "1.0.0"
+    },
+    {
+      "bom-ref": "pkg:npm/devkit@1.0.0",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "abcd"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "name": "devkit",
+      "properties": [
+        {
+          "name": "lockward:dev",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:npm/devkit@1.0.0",
+      "scope": "excluded",
+      "type": "library",
+      "version": "1.0.0"
+    },
+    {
+      "bom-ref": "pkg:npm/gone@1.0.0",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "abcd"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "name": "gone",
+      "purl": "pkg:npm/gone@1.0.0",
+      "scope": "required",
+      "type": "library",
+      "version": "1.0.0"
+    },
+    {
+      "bom-ref": "pkg:npm/licensed@1.0.0",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "abcd"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "name": "licensed",
+      "purl": "pkg:npm/licensed@1.0.0",
+      "scope": "required",
+      "type": "library",
+      "version": "1.0.0"
+    },
+    {
+      "bom-ref": "pkg:npm/multi@1.0.0",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "abcd"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "name": "multi",
+      "purl": "pkg:npm/multi@1.0.0",
+      "scope": "required",
+      "type": "library",
+      "version": "1.0.0"
+    },
+    {
+      "bom-ref": "pkg:npm/multi@2.0.0",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "abcd"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "name": "multi",
+      "purl": "pkg:npm/multi@2.0.0",
+      "scope": "required",
+      "type": "library",
+      "version": "2.0.0"
+    },
+    {
+      "bom-ref": "pkg:npm/promoted@1.0.0",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "abcd"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "name": "promoted",
+      "purl": "pkg:npm/promoted@1.0.0",
+      "scope": "required",
+      "type": "library",
+      "version": "1.0.0"
+    },
+    {
+      "bom-ref": "pkg:npm/rolled@2.0.0",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "abcd"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "name": "rolled",
+      "purl": "pkg:npm/rolled@2.0.0",
+      "scope": "required",
+      "type": "library",
+      "version": "2.0.0"
+    }
+  ],
+  "dependencies": [
+    {
+      "dependsOn": [],
+      "ref": "pkg:npm/%40scope/left-pad@1.2.0"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:npm/ansi-regex@5.0.1"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:npm/bumped@1.0.0"
+    },
+    {
+      "dependsOn": [
+        "pkg:npm/multi@2.0.0",
+        "pkg:npm/promoted@1.0.0"
+      ],
+      "ref": "pkg:npm/carrier@1.0.0"
+    },
+    {
+      "dependsOn": [
+        "pkg:npm/cycle-b@1.0.0"
+      ],
+      "ref": "pkg:npm/cycle-a@1.0.0"
+    },
+    {
+      "dependsOn": [
+        "pkg:npm/cycle-a@1.0.0"
+      ],
+      "ref": "pkg:npm/cycle-b@1.0.0"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:npm/devkit@1.0.0"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:npm/gone@1.0.0"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:npm/licensed@1.0.0"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:npm/multi@1.0.0"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:npm/multi@2.0.0"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:npm/promoted@1.0.0"
+    },
+    {
+      "dependsOn": [
+        "pkg:npm/%40scope/left-pad@1.2.0",
+        "pkg:npm/ansi-regex@5.0.1",
+        "pkg:npm/bumped@1.0.0",
+        "pkg:npm/carrier@1.0.0",
+        "pkg:npm/cycle-a@1.0.0",
+        "pkg:npm/devkit@1.0.0",
+        "pkg:npm/gone@1.0.0",
+        "pkg:npm/licensed@1.0.0",
+        "pkg:npm/multi@1.0.0",
+        "pkg:npm/rolled@2.0.0"
+      ],
+      "ref": "pkg:npm/review-app@1.0.0"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:npm/rolled@2.0.0"
+    }
+  ],
+  "metadata": {
+    "component": {
+      "bom-ref": "pkg:npm/review-app@1.0.0",
+      "name": "review-app",
+      "properties": [
+        {
+          "name": "lockward:unresolved-edges",
+          "value": "0"
+        }
+      ],
+      "purl": "pkg:npm/review-app@1.0.0",
+      "type": "application",
+      "version": "1.0.0"
+    },
+    "timestamp": "2026-01-01T00:00:00Z",
+    "tools": {
+      "components": [
+        {
+          "author": "YaDe Labs",
+          "name": "lockward",
+          "type": "application",
+          "version": "0.2.0"
+        }
+      ]
+    }
+  },
+  "serialNumber": "urn:uuid:23536309-b1de-530c-97fc-d070a3dd1e1c",
+  "specVersion": "1.6",
+  "version": 1
+}

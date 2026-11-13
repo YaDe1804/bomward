@@ -1,0 +1,18 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "components": [
+    {
+      "type": "library",
+      "name": "left-pad",
+      "version": "1.0.0",
+      "purl": "pkg:npm/left-pad@1.0.0"
+    },
+    {
+      "type": "library",
+      "name": "left-pad",
+      "version": "2.0.0",
+      "purl": "pkg:npm/left-pad@2.0.0"
+    }
+  ]
+}
