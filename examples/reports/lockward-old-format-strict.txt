@@ -3,7 +3,7 @@ Result: Deny
 Exit code: 1
 Mode: enforce
 Decisions: 2 denials, 7 warnings, 0 allowed
-Changes: 3 added changes, 1 removed change, 2 version-changed changes, 1 license-changed change, 0 supplier-changed changes, 0 hash-changed changes, 0 hash-coverage-changed changes, 1 scope-changed change, 0 role-changed changes
+Changes: 3 added, 1 removed, 2 version-changed, 1 license-changed, 1 scope-changed
 
 Denied
 
@@ -26,11 +26,11 @@ Scopes added: required. Removed: excluded.
 Rules: scope-becomes-required.
 
 Warning npm fresh@1.0.0 added direct
-Added. Introduced by npm review-app@1.0.0. Path from the root: npm review-app@1.0.0, npm fresh@1.0.0. Licenses: MIT. Suppliers: none. Scopes: required. Hash algorithms: SHA-256. Hash contents: abcd.
+Added. Licenses: MIT. Suppliers: none. Scopes: required. Hash algorithms: SHA-256.
 Rules: new-direct.
 
 Warning npm gone@1.0.0 removed unknown
-Removed. Licenses: MIT. Suppliers: none. Scopes: required. Hash algorithms: SHA-256. Hash contents: abcd.
+Removed. Licenses: MIT. Suppliers: none. Scopes: required. Hash algorithms: SHA-256.
 Decision from default.
 
 Warning npm licensed@1.0.0 license-changed direct
@@ -38,14 +38,13 @@ Licenses added: Apache-2.0. Removed: MIT.
 Decision from default.
 
 Warning npm multi@3.0.0 added transitive
-Added. Introduced by npm fresh@1.0.0. Path from the root: npm review-app@1.0.0, npm fresh@1.0.0, npm multi@3.0.0. Licenses: MIT. Suppliers: none. Scopes: required. Hash algorithms: SHA-256. Hash contents: abcd.
+Added. Introduced by npm fresh@1.0.0. Path from the root: npm review-app@1.0.0, npm fresh@1.0.0, npm multi@3.0.0. Licenses: MIT. Suppliers: none. Scopes: required. Hash algorithms: SHA-256.
 Decision from default.
 
 Warning npm nested-new@1.0.0 added transitive
-Added. Introduced by npm fresh@1.0.0. Path from the root: npm review-app@1.0.0, npm fresh@1.0.0, npm nested-new@1.0.0. Licenses: MIT. Suppliers: none. Scopes: required. Hash algorithms: SHA-256. Hash contents: abcd.
+Added. Introduced by npm fresh@1.0.0. Path from the root: npm review-app@1.0.0, npm fresh@1.0.0, npm nested-new@1.0.0. Licenses: MIT. Suppliers: none. Scopes: required. Hash algorithms: SHA-256.
 Decision from default.
 
 Notes
 Roles were not compared because at least one document has no dependency graph.
-Warnings in the new document: none.
 Warnings in the old document: 1 role-unknown warning (no package).

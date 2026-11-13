@@ -152,6 +152,9 @@ fn run_diff(
     limits: (u64, u64, u32),
 ) -> Result<u8, CliError> {
     let limits = Limits::new(limits.0, limits.1, limits.2).map_err(message)?;
+    if let Some(path) = output {
+        reject_output_over_input(path, old, new)?;
+    }
     let policy = match policy {
         Some(path) => Some(read_policy(path)?),
         None => None,
@@ -205,6 +208,29 @@ fn report_format(format: OutputFormat) -> Format {
         OutputFormat::Terminal => Format::Terminal,
         OutputFormat::Markdown => Format::Markdown,
         OutputFormat::Json => Format::Json,
+    }
+}
+
+fn reject_output_over_input(output: &Path, old: &Path, new: &Path) -> Result<(), CliError> {
+    if same_file(output, old) {
+        return Err(message(format!(
+            "refusing to write the report over OLD {}",
+            output.display()
+        )));
+    }
+    if same_file(output, new) {
+        return Err(message(format!(
+            "refusing to write the report over NEW {}",
+            output.display()
+        )));
+    }
+    Ok(())
+}
+
+fn same_file(left: &Path, right: &Path) -> bool {
+    match (std::fs::canonicalize(left), std::fs::canonicalize(right)) {
+        (Ok(left), Ok(right)) => left == right,
+        _ => false,
     }
 }
 

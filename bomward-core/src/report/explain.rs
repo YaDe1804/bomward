@@ -14,26 +14,65 @@ use crate::model::{ContentHash, DependencyRole, VersionAttributes, WarningKind};
 
 use super::text::{Phrase, direction_text, package_label, role_id, value_list};
 
+/// What the human report may leave out. JSON keeps the full sentence.
+#[derive(Clone, Copy)]
+struct Prose {
+    provenance: bool,
+    hash_contents: bool,
+}
+
+const FULL: Prose = Prose {
+    provenance: true,
+    hash_contents: true,
+};
+
 /// Sentence for one dependency change. The package label is not repeated.
 pub(crate) fn change_phrases(change: &Change) -> Vec<Phrase> {
+    change_phrases_for(change, FULL)
+}
+
+/// The same sentence for Markdown and the terminal.
+///
+/// Hash contents stay in JSON. Provenance is kept only for a transitive add,
+/// because a direct package would only repeat the project component.
+pub(crate) fn human_change_phrases(change: &Change) -> Vec<Phrase> {
+    let provenance = matches!(change.detail, ChangeDetail::Added { .. })
+        && change.new_role == Some(DependencyRole::Transitive);
+    change_phrases_for(
+        change,
+        Prose {
+            provenance,
+            hash_contents: false,
+        },
+    )
+}
+
+fn change_phrases_for(change: &Change, prose: Prose) -> Vec<Phrase> {
     match &change.detail {
         ChangeDetail::Added {
             attributes,
             introduced_by,
             path_from_root,
-        } => added_phrases(attributes, introduced_by, path_from_root.as_ref()),
-        ChangeDetail::Removed { attributes } => removed_phrases(attributes),
+        } => added_phrases(attributes, introduced_by, path_from_root.as_ref(), prose),
+        ChangeDetail::Removed { attributes } => removed_phrases(attributes, prose.hash_contents),
         ChangeDetail::VersionChanged {
             direction,
             old_attributes,
             new_attributes,
             flags,
-        } => version_phrases(change, *direction, old_attributes, new_attributes, flags),
+        } => version_phrases(
+            change,
+            *direction,
+            old_attributes,
+            new_attributes,
+            flags,
+            prose.hash_contents,
+        ),
         ChangeDetail::SetChanged { added, removed } => {
             set_phrases(change.kind.id(), added, removed)
         }
         ChangeDetail::HashChanged { algorithms } => {
-            hash_phrases(&change.version.version, algorithms)
+            hash_phrases(&change.version.version, algorithms, prose.hash_contents)
         }
         ChangeDetail::HashCoverageChanged {
             added,
@@ -46,6 +85,15 @@ pub(crate) fn change_phrases(change: &Change) -> Vec<Phrase> {
 
 /// Sentence for the project component.
 pub(crate) fn root_phrases(root: &RootChange) -> Vec<Phrase> {
+    root_phrases_for(root, true)
+}
+
+/// Project-component sentence for Markdown and the terminal.
+pub(crate) fn human_root_phrases(root: &RootChange) -> Vec<Phrase> {
+    root_phrases_for(root, false)
+}
+
+fn root_phrases_for(root: &RootChange, hash_contents: bool) -> Vec<Phrase> {
     match (&root.old, &root.new) {
         (Some(old), Some(new)) => {
             let mut phrases = vec![Phrase::Text(
@@ -55,7 +103,11 @@ pub(crate) fn root_phrases(root: &RootChange) -> Vec<Phrase> {
             phrases.push(Phrase::Text(" to ".to_owned()));
             phrases.extend(snapshot_value(new));
             phrases.push(Phrase::Text(".".to_owned()));
-            phrases.extend(attribute_delta(&old.attributes, &new.attributes));
+            phrases.extend(attribute_delta(
+                &old.attributes,
+                &new.attributes,
+                hash_contents,
+            ));
             phrases
         }
         (None, Some(new)) => {
@@ -96,32 +148,35 @@ fn added_phrases(
     attributes: &VersionAttributes,
     introduced_by: &BoundedNodes,
     path_from_root: Option<&BoundedNodes>,
+    prose: Prose,
 ) -> Vec<Phrase> {
     let mut phrases = vec![Phrase::Text("Added. ".to_owned())];
-    phrases.extend(nodes_phrases(
-        "Introduced by ",
-        introduced_by,
-        "Nothing in the graph depends on it",
-    ));
-    phrases.push(Phrase::Text(". ".to_owned()));
-    match path_from_root {
-        Some(path) => {
-            phrases.extend(nodes_phrases(
-                "Path from the root: ",
-                path,
-                "No path from the root",
-            ));
-            phrases.push(Phrase::Text(". ".to_owned()));
+    if prose.provenance {
+        phrases.extend(nodes_phrases(
+            "Introduced by ",
+            introduced_by,
+            "Nothing in the graph depends on it",
+        ));
+        phrases.push(Phrase::Text(". ".to_owned()));
+        match path_from_root {
+            Some(path) => {
+                phrases.extend(nodes_phrases(
+                    "Path from the root: ",
+                    path,
+                    "No path from the root",
+                ));
+                phrases.push(Phrase::Text(". ".to_owned()));
+            }
+            None => phrases.push(Phrase::Text("No path from the root. ".to_owned())),
         }
-        None => phrases.push(Phrase::Text("No path from the root. ".to_owned())),
     }
-    phrases.extend(attribute_inventory(attributes));
+    phrases.extend(attribute_inventory(attributes, prose.hash_contents));
     phrases
 }
 
-fn removed_phrases(attributes: &VersionAttributes) -> Vec<Phrase> {
+fn removed_phrases(attributes: &VersionAttributes, hash_contents: bool) -> Vec<Phrase> {
     let mut phrases = vec![Phrase::Text("Removed. ".to_owned())];
-    phrases.extend(attribute_inventory(attributes));
+    phrases.extend(attribute_inventory(attributes, hash_contents));
     phrases
 }
 
@@ -131,6 +186,7 @@ fn version_phrases(
     old_attributes: &VersionAttributes,
     new_attributes: &VersionAttributes,
     flags: &BTreeSet<AttributeFlag>,
+    hash_contents: bool,
 ) -> Vec<Phrase> {
     let mut phrases = vec![Phrase::Text("Version changed from ".to_owned())];
     phrases.push(Phrase::Value(display_version(
@@ -157,6 +213,7 @@ fn version_phrases(
             new_attributes,
             change.old_role,
             change.new_role,
+            hash_contents,
         ));
     }
     phrases
@@ -168,12 +225,13 @@ fn flag_phrases(
     new: &VersionAttributes,
     old_role: Option<DependencyRole>,
     new_role: Option<DependencyRole>,
+    hash_contents: bool,
 ) -> Vec<Phrase> {
     match flag {
         AttributeFlag::LicenseChanged => set_clause("Licenses", &old.licenses, &new.licenses),
         AttributeFlag::SupplierChanged => set_clause("Suppliers", &old.suppliers, &new.suppliers),
         AttributeFlag::ScopeChanged => set_clause("Scopes", &old.scopes, &new.scopes),
-        AttributeFlag::HashChanged => hash_flag_phrases(&old.hashes, &new.hashes),
+        AttributeFlag::HashChanged => hash_flag_phrases(&old.hashes, &new.hashes, hash_contents),
         AttributeFlag::HashCoverageChanged => {
             let (added, removed) = algorithm_delta(&old.hashes, &new.hashes);
             let all_dropped = new.hashes.is_empty() && !old.hashes.is_empty();
@@ -207,7 +265,7 @@ fn set_clause(title: &str, old: &BTreeSet<String>, new: &BTreeSet<String>) -> Ve
     phrases
 }
 
-fn hash_phrases(version: &str, algorithms: &[HashConflict]) -> Vec<Phrase> {
+fn hash_phrases(version: &str, algorithms: &[HashConflict], hash_contents: bool) -> Vec<Phrase> {
     let mut phrases = vec![
         Phrase::Text("Same version, different content. Version ".to_owned()),
         Phrase::Value(version.to_owned()),
@@ -219,31 +277,43 @@ fn hash_phrases(version: &str, algorithms: &[HashConflict]) -> Vec<Phrase> {
         }
         phrases.push(Phrase::Text("Algorithm ".to_owned()));
         phrases.push(Phrase::Value(conflict.algorithm.clone()));
-        phrases.push(Phrase::Text(" changed from ".to_owned()));
-        phrases.extend(value_list("", &sorted(&conflict.old_contents)));
-        phrases.push(Phrase::Text(" to ".to_owned()));
-        phrases.extend(value_list("", &sorted(&conflict.new_contents)));
-        phrases.push(Phrase::Text(".".to_owned()));
+        if hash_contents {
+            phrases.push(Phrase::Text(" changed from ".to_owned()));
+            phrases.extend(value_list("", &sorted(&conflict.old_contents)));
+            phrases.push(Phrase::Text(" to ".to_owned()));
+            phrases.extend(value_list("", &sorted(&conflict.new_contents)));
+            phrases.push(Phrase::Text(".".to_owned()));
+        } else {
+            phrases.push(Phrase::Text(" changed.".to_owned()));
+        }
     }
     phrases
 }
 
-fn hash_flag_phrases(old: &BTreeSet<ContentHash>, new: &BTreeSet<ContentHash>) -> Vec<Phrase> {
+fn hash_flag_phrases(
+    old: &BTreeSet<ContentHash>,
+    new: &BTreeSet<ContentHash>,
+    hash_contents: bool,
+) -> Vec<Phrase> {
     let mut phrases = vec![Phrase::Text("Hash content changed.".to_owned())];
     for conflict in hash_conflicts(old, new) {
         phrases.push(Phrase::Text(" ".to_owned()));
         phrases.push(Phrase::Value(conflict.algorithm));
-        phrases.push(Phrase::Text(" from ".to_owned()));
-        phrases.extend(value_list(
-            "",
-            &conflict.old_contents.into_iter().collect::<Vec<_>>(),
-        ));
-        phrases.push(Phrase::Text(" to ".to_owned()));
-        phrases.extend(value_list(
-            "",
-            &conflict.new_contents.into_iter().collect::<Vec<_>>(),
-        ));
-        phrases.push(Phrase::Text(".".to_owned()));
+        if hash_contents {
+            phrases.push(Phrase::Text(" from ".to_owned()));
+            phrases.extend(value_list(
+                "",
+                &conflict.old_contents.into_iter().collect::<Vec<_>>(),
+            ));
+            phrases.push(Phrase::Text(" to ".to_owned()));
+            phrases.extend(value_list(
+                "",
+                &conflict.new_contents.into_iter().collect::<Vec<_>>(),
+            ));
+            phrases.push(Phrase::Text(".".to_owned()));
+        } else {
+            phrases.push(Phrase::Text(".".to_owned()));
+        }
     }
     phrases
 }
@@ -288,7 +358,7 @@ fn role_phrases(old: Option<DependencyRole>, new: Option<DependencyRole>) -> Vec
     ]
 }
 
-fn attribute_inventory(attributes: &VersionAttributes) -> Vec<Phrase> {
+fn attribute_inventory(attributes: &VersionAttributes, hash_contents: bool) -> Vec<Phrase> {
     let mut phrases = value_list(
         "Licenses: ",
         &attributes.licenses.iter().cloned().collect::<Vec<_>>(),
@@ -308,20 +378,28 @@ fn attribute_inventory(attributes: &VersionAttributes) -> Vec<Phrase> {
         "Hash algorithms: ",
         &algorithm_names(&attributes.hashes),
     ));
-    phrases.push(Phrase::Text(". ".to_owned()));
-    phrases.extend(value_list(
-        "Hash contents: ",
-        &attributes
-            .hashes
-            .iter()
-            .map(|hash| hash.content.clone())
-            .collect::<Vec<_>>(),
-    ));
-    phrases.push(Phrase::Text(".".to_owned()));
+    if hash_contents {
+        phrases.push(Phrase::Text(". ".to_owned()));
+        phrases.extend(value_list(
+            "Hash contents: ",
+            &attributes
+                .hashes
+                .iter()
+                .map(|hash| hash.content.clone())
+                .collect::<Vec<_>>(),
+        ));
+        phrases.push(Phrase::Text(".".to_owned()));
+    } else {
+        phrases.push(Phrase::Text(".".to_owned()));
+    }
     phrases
 }
 
-fn attribute_delta(old: &VersionAttributes, new: &VersionAttributes) -> Vec<Phrase> {
+fn attribute_delta(
+    old: &VersionAttributes,
+    new: &VersionAttributes,
+    hash_contents: bool,
+) -> Vec<Phrase> {
     let mut phrases = Vec::new();
     if old.licenses != new.licenses {
         phrases.push(Phrase::Text(" ".to_owned()));
@@ -337,7 +415,7 @@ fn attribute_delta(old: &VersionAttributes, new: &VersionAttributes) -> Vec<Phra
     }
     if old.hashes != new.hashes {
         phrases.push(Phrase::Text(" ".to_owned()));
-        phrases.extend(hash_flag_phrases(&old.hashes, &new.hashes));
+        phrases.extend(hash_flag_phrases(&old.hashes, &new.hashes, hash_contents));
     }
     phrases
 }

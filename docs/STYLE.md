@@ -8,12 +8,24 @@ English is the only language. Write the sentence a reviewer can check, then stop
 - Sentence case in headings: "Denied", not "DENIED".
 - One term for one thing. Use the glossary below. Do not alternate synonyms.
 - A change entry names the package, then what changed, then the rule ids.
+  Markdown writes that as one list item. The section heading already
+  says Denied, Warnings, or Allowed, so the item does not repeat it.
+  The terminal still starts a judged line with `Deny`, `Warning`, or
+  `Allow`.
 
 ```
-Deny  npm left-pad@1.1.0  version-changed  direct
-Version changed from 1.0.0 to 1.1.0 (upgrade).
-Rules: no-downgrade.
+- npm left-pad@1.1.0 version-changed direct
+  Version changed from 1.0.0 to 1.1.0 (upgrade).
+  Rules: no-downgrade.
 ```
+
+The changes line lists only kinds with a count above zero, and it does
+not repeat the word "change": `3 added, 1 removed, 1 version-changed`.
+No changes is the sentence `No dependency changes.`
+
+Hash contents are JSON only. Markdown and the terminal name the
+algorithms. `Introduced by` and `Path from the root` are written only
+for a transitive package. A notes line that says `none` is omitted.
 
 ## Glossary
 

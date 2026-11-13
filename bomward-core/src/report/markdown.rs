@@ -11,6 +11,7 @@ pub const MARKDOWN_CHAR_BUDGET: usize = 60_000;
 
 pub(crate) fn render(prepared: &Prepared) -> String {
     let header = render_header(&prepared.lines);
+    let footer = version_footer(&prepared.lines);
     let notes = render_notes(&prepared.notes);
     let mut changes = Vec::new();
     let mut denied = Vec::new();
@@ -25,17 +26,23 @@ pub(crate) fn render(prepared: &Prepared) -> String {
             _ => changes = rendered,
         }
     }
-    fit(&header, &changes, &denied, &warnings, &allowed, &notes)
+    fit(
+        &header, &footer, &changes, &denied, &warnings, &allowed, &notes,
+    )
+}
+
+fn version_footer(lines: &[Line]) -> String {
+    match lines.first() {
+        Some(Line::Text(text)) => format!("{text}\n"),
+        None => String::new(),
+    }
 }
 
 fn render_header(lines: &[Line]) -> String {
-    let mut out = String::new();
-    for (index, line) in lines.iter().enumerate() {
+    let mut out = String::from("# bomward review\n\n");
+    for line in lines.iter().skip(1) {
         let Line::Text(text) = line;
-        if index == 0 {
-            out.push_str("# ");
-            out.push_str(text);
-        } else if let Some((label, rest)) = text.split_once(": ") {
+        if let Some((label, rest)) = text.split_once(": ") {
             out.push_str("**");
             out.push_str(label);
             out.push_str(":** ");
@@ -49,17 +56,33 @@ fn render_header(lines: &[Line]) -> String {
 }
 
 fn render_entry(entry: &Entry) -> String {
-    let mut out = render_phrases(&entry.heading);
-    out.push_str("\n\n");
-    out.push_str(&render_phrases(&entry.phrases));
+    let mut out = String::from("- ");
+    out.push_str(&render_phrases(without_decision(&entry.heading)));
     out.push('\n');
+    push_continued(&mut out, &render_phrases(&entry.phrases));
     if !entry.rules.is_empty() {
-        out.push('\n');
-        out.push_str(&render_phrases(&entry.rules));
+        push_continued(&mut out, &render_phrases(&entry.rules));
+    }
+    out
+}
+
+fn without_decision(phrases: &[Phrase]) -> &[Phrase] {
+    match phrases {
+        [Phrase::Text(label), Phrase::Text(space), rest @ ..]
+            if space == " " && matches!(label.as_str(), "Deny" | "Warning" | "Allow") =>
+        {
+            rest
+        }
+        _ => phrases,
+    }
+}
+
+fn push_continued(out: &mut String, text: &str) {
+    for line in text.lines() {
+        out.push_str("  ");
+        out.push_str(line);
         out.push('\n');
     }
-    out.push('\n');
-    out
 }
 
 fn render_notes(notes: &[Vec<Phrase>]) -> String {
@@ -87,6 +110,7 @@ fn render_phrases(phrases: &[Phrase]) -> String {
 
 struct Parts<'a> {
     header: &'a str,
+    footer: &'a str,
     changes: &'a [String],
     denied: &'a [String],
     warnings: &'a [String],
@@ -117,6 +141,7 @@ struct Cost {
 
 fn fit(
     header: &str,
+    footer: &str,
     changes: &[String],
     denied: &[String],
     warnings: &[String],
@@ -125,13 +150,14 @@ fn fit(
 ) -> String {
     let parts = Parts {
         header,
+        footer,
         changes,
         denied,
         warnings,
         allowed,
         notes,
     };
-    let header_len = chars(header);
+    let header_len = chars(header) + chars(footer);
     let notes_len = chars(notes);
     let changes_full = section_len(changes, "## Changes\n\n");
     let denied_full = section_len(denied, "## Denied\n\n");
@@ -293,6 +319,7 @@ fn compose(parts: &Parts<'_>, keep: Keep) -> String {
     if !out.ends_with('\n') {
         out.push('\n');
     }
+    out.push_str(parts.footer);
     out
 }
 
@@ -364,7 +391,7 @@ fn section_len(entries: &[String], heading: &str) -> usize {
     if entries.is_empty() {
         return 0;
     }
-    chars(heading) + entries.iter().map(|entry| chars(entry)).sum::<usize>()
+    chars(heading) + entries.iter().map(|entry| chars(entry)).sum::<usize>() + 1
 }
 
 fn folded_len(entries: &[String], keep: usize) -> usize {
@@ -377,6 +404,7 @@ fn folded_len(entries: &[String], keep: usize) -> usize {
         + chars(&summary)
         + chars("</summary>\n\n")
         + body
+        + 1
         + chars("</details>\n\n")
 }
 
@@ -388,6 +416,7 @@ fn visible_section(entries: &[String], keep: usize, title: &str) -> String {
     for entry in entries.iter().take(keep) {
         out.push_str(entry);
     }
+    out.push('\n');
     out
 }
 
@@ -399,7 +428,7 @@ fn folded_section(entries: &[String], keep: usize) -> String {
     for entry in entries.iter().take(keep) {
         body.push_str(entry);
     }
-    format!("<details>\n<summary>Allowed ({keep})</summary>\n\n{body}</details>\n\n")
+    format!("<details>\n<summary>Allowed ({keep})</summary>\n\n{body}\n</details>\n\n")
 }
 
 fn omission(omitted: usize, total: usize, one: &str, many: &str) -> String {

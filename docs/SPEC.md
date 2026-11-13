@@ -115,7 +115,7 @@ bomward diff <OLD> <NEW> [--policy <FILE>] [--format <terminal|markdown|json>] [
 | `NEW` | Candidate CycloneDX JSON file. Required. |
 | `--policy <FILE>` | Policy file. Optional. Omit it for report-only mode. |
 | `--format` | `terminal` (default), `markdown`, or `json`. |
-| `--output <FILE>` | Write the report to this file. Stdout stays empty. The file is created or truncated. Parent directories are not created. |
+| `--output <FILE>` | Write the report to this file. Stdout stays empty. The file is created or truncated. Parent directories are not created. A path that is `OLD` or `NEW` is rejected. |
 | `--max-file-bytes` | Max size of one input file. Default `33554432`. |
 | `--max-components` | Max component objects, including nested ones. Default `100000`. |
 | `--max-depth` | Max nesting of `components` inside `components`. Does not limit dependency-graph path length or JSON container depth. Default `32`. Maximum `63`. |

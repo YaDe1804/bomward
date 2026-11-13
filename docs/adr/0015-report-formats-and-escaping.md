@@ -72,9 +72,26 @@ entries and around the notes. Denied entries and warnings stay visible.
 
 `MARKDOWN_CHAR_BUDGET` is 60,000 Unicode scalars, under GitHub's 65,536
 character comment limit. When the comment would be longer, allowed
-entries are dropped first, then warnings, then denied entries. The cut
-says how many entries of that class are missing and that the JSON report
-is complete. Denied entries are never the first class to be cut.
+entries are dropped first, then warnings, then the notes, then denied
+entries. The cut says how many entries of that class are missing and
+that the JSON report is complete. Denied entries are never the first
+class to be cut.
+
+The Markdown title is `# bomward review`. The tool version is the last
+line, `bomward 0.1.0`. Each entry is one list item: the package, the
+kind, and the role on the first line, then the sentence and the rule
+line indented under it. The section heading already says Denied,
+Warnings, or Allowed, so the entry does not repeat that word.
+
+Markdown and the terminal share a shorter wording than the JSON
+`message` field. The `Changes` line lists only kinds whose count is
+greater than zero, as `3 added, 1 removed`, without repeating the word
+"change". No changes stays `No dependency changes.` Hash contents are
+omitted; the algorithms are named. `Introduced by` and `Path from the
+root` are written only for a transitive package. A notes line that says
+`none` is omitted, and the notes block is omitted when nothing remains.
+JSON keeps the full `message` and the structured hash contents, so a
+program does not depend on the shorter wording.
 
 ### JSON
 

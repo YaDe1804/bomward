@@ -1,4 +1,4 @@
-# bomward 0.1.0
+# bomward review
 
 **Result:** Warning
 
@@ -10,66 +10,41 @@
 
 **Decisions:** 0 denials, 3 warnings, 6 allowed
 
-**Changes:** 3 added changes, 1 removed change, 2 version-changed changes, 1 license-changed change, 0 supplier-changed changes, 0 hash-changed changes, 0 hash-coverage-changed changes, 1 scope-changed change, 0 role-changed changes
+**Changes:** 3 added, 1 removed, 2 version-changed, 1 license-changed, 1 scope-changed
 
 ## Warnings
 
-Warning `npm` `devkit`@`1.0.0` scope-changed direct
-
-Scopes added: `required`. Removed: `excluded`.
-
-Rules: `scope-becomes-required`.
-
-Warning `npm` `fresh`@`1.0.0` added direct
-
-Added. Introduced by `npm` `review-app`@`1.0.0`. Path from the root: `npm` `review-app`@`1.0.0`, `npm` `fresh`@`1.0.0`. Licenses: `MIT`. Suppliers: none. Scopes: `required`. Hash algorithms: `SHA-256`. Hash contents: `abcd`.
-
-Rules: `new-direct`.
-
-Warning `npm` `rolled`@`1.0.0` version-changed direct
-
-Version changed from `2.0.0` to `1.0.0` (downgrade).
-
-Rules: `no-downgrade`.
+- `npm` `devkit`@`1.0.0` scope-changed direct
+  Scopes added: `required`. Removed: `excluded`.
+  Rules: `scope-becomes-required`.
+- `npm` `fresh`@`1.0.0` added direct
+  Added. Licenses: `MIT`. Suppliers: none. Scopes: `required`. Hash algorithms: `SHA-256`.
+  Rules: `new-direct`.
+- `npm` `rolled`@`1.0.0` version-changed direct
+  Version changed from `2.0.0` to `1.0.0` (downgrade).
+  Rules: `no-downgrade`.
 
 <details>
 <summary>Allowed (6)</summary>
 
-Allow  graph-unavailable
-
-Document condition graph-unavailable.
-
-Decision from default.
-
-Allow `npm` `bumped`@`1.1.0` version-changed direct
-
-Version changed from `1.0.0` to `1.1.0` (upgrade).
-
-Decision from default.
-
-Allow `npm` `gone`@`1.0.0` removed unknown
-
-Removed. Licenses: `MIT`. Suppliers: none. Scopes: `required`. Hash algorithms: `SHA-256`. Hash contents: `abcd`.
-
-Decision from default.
-
-Allow `npm` `licensed`@`1.0.0` license-changed direct
-
-Licenses added: `Apache-2.0`. Removed: `MIT`.
-
-Decision from default.
-
-Allow `npm` `multi`@`3.0.0` added transitive
-
-Added. Introduced by `npm` `fresh`@`1.0.0`. Path from the root: `npm` `review-app`@`1.0.0`, `npm` `fresh`@`1.0.0`, `npm` `multi`@`3.0.0`. Licenses: `MIT`. Suppliers: none. Scopes: `required`. Hash algorithms: `SHA-256`. Hash contents: `abcd`.
-
-Decision from default.
-
-Allow `npm` `nested-new`@`1.0.0` added transitive
-
-Added. Introduced by `npm` `fresh`@`1.0.0`. Path from the root: `npm` `review-app`@`1.0.0`, `npm` `fresh`@`1.0.0`, `npm` `nested-new`@`1.0.0`. Licenses: `MIT`. Suppliers: none. Scopes: `required`. Hash algorithms: `SHA-256`. Hash contents: `abcd`.
-
-Decision from default.
+-  graph-unavailable
+  Document condition graph-unavailable.
+  Decision from default.
+- `npm` `bumped`@`1.1.0` version-changed direct
+  Version changed from `1.0.0` to `1.1.0` (upgrade).
+  Decision from default.
+- `npm` `gone`@`1.0.0` removed unknown
+  Removed. Licenses: `MIT`. Suppliers: none. Scopes: `required`. Hash algorithms: `SHA-256`.
+  Decision from default.
+- `npm` `licensed`@`1.0.0` license-changed direct
+  Licenses added: `Apache-2.0`. Removed: `MIT`.
+  Decision from default.
+- `npm` `multi`@`3.0.0` added transitive
+  Added. Introduced by `npm` `fresh`@`1.0.0`. Path from the root: `npm` `review-app`@`1.0.0`, `npm` `fresh`@`1.0.0`, `npm` `multi`@`3.0.0`. Licenses: `MIT`. Suppliers: none. Scopes: `required`. Hash algorithms: `SHA-256`.
+  Decision from default.
+- `npm` `nested-new`@`1.0.0` added transitive
+  Added. Introduced by `npm` `fresh`@`1.0.0`. Path from the root: `npm` `review-app`@`1.0.0`, `npm` `fresh`@`1.0.0`, `npm` `nested-new`@`1.0.0`. Licenses: `MIT`. Suppliers: none. Scopes: `required`. Hash algorithms: `SHA-256`.
+  Decision from default.
 
 </details>
 
@@ -78,9 +53,8 @@ Decision from default.
 
 Roles were not compared because at least one document has no dependency graph.
 
-Warnings in the new document: none.
-
 Warnings in the old document: 1 role-unknown warning (no package).
 
 </details>
 
+bomward 0.1.0

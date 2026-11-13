@@ -1,9 +1,12 @@
 # Report
 
-`bomward diff` writes one review in one of three formats. The sentences
-are the same in all three. Rule ids and change ids are copied as the
-policy and the diff spell them. [ADR 0015](adr/0015-report-formats-and-escaping.md)
-records the format rules. [STYLE.md](STYLE.md) is the word list.
+`bomward diff` writes one review in one of three formats. Markdown and
+the terminal share one wording. JSON keeps that review in structured
+fields, and its `message` is the full sentence, including hash contents
+and the provenance of a direct package. Rule ids and change ids are
+copied as the policy and the diff spell them.
+[ADR 0015](adr/0015-report-formats-and-escaping.md) records the format
+rules. [STYLE.md](STYLE.md) is the word list.
 
 ```text
 bomward diff OLD NEW [--policy FILE] [--format terminal|markdown|json] [--output FILE]
@@ -11,12 +14,14 @@ bomward diff OLD NEW [--policy FILE] [--format terminal|markdown|json] [--output
 
 `--format` defaults to `terminal`. The report goes to stdout. `--output`
 writes those same bytes to a file and leaves stdout empty. The file is
-created or replaced. Parent directories are not created.
+created or replaced. Parent directories are not created. If the path is
+one of the two SBOM files, the command exits 2 and does not write it.
 
 ## What the header says
 
-The first lines name the tool and its version, the result, the exit
-code, and the mode.
+The terminal starts with the tool and its version. Markdown titles the
+comment `# bomward review` and puts `bomward 0.1.0` on the last line.
+Both then name the result, the exit code, and the mode.
 
 | Mode | Result line | Exit code |
 | --- | --- | --- |
@@ -29,20 +34,26 @@ code, and the mode.
 The exit code stays 0. The header counts, the listed entries, and the
 exit code describe that same state.
 
-An empty diff says `No dependency changes.` and does not add empty
-sections.
+The changes line names only kinds with a count above zero:
+`Changes: 3 added, 1 removed, 2 version-changed`. It does not repeat
+the word "change". An empty diff says `No dependency changes.` and
+does not add empty sections.
 
 ## Terminal
 
 Plain text. No color, no wrapping to the width of the terminal, and
 line endings are LF.
 
-Text that came from an SBOM is encoded before it is printed. These
-characters become `\u{XXXX}`: C0 controls and DEL, C1 controls
-(U+0080–U+009F), and the bidirectional and line controls U+061C,
-U+200E, U+200F, U+2028, U+2029, U+202A–U+202E, and U+2066–U+2069.
-A value longer than 256 Unicode scalars is cut there, then an ellipsis
-and the total number of scalars are added.
+Text that came from an SBOM is encoded before it is printed. The
+characters are the set in
+[ADR 0015](adr/0015-report-formats-and-escaping.md): controls, format
+characters, default-ignorable characters, and every space except
+U+0020. A value longer than 256 Unicode scalars is cut there, then an
+ellipsis and the total number of scalars are added. Hash contents are
+not printed. The line names the algorithms. `Introduced by` and
+`Path from the root` are printed only for a transitive package. A notes
+line that says `none` is left out, and the notes block is left out when
+nothing remains.
 
 ## Markdown
 
@@ -50,11 +61,17 @@ This is the text for a pull-request comment. Denied entries and
 warnings stay visible. Allowed entries and the notes sit in `<details>`
 blocks. Those are the only HTML tags the report writes.
 
-A string from an SBOM is written only inside a code span. The span uses
-more backticks than the value contains, so a backtick in a name cannot
-end the span. The same characters as in the terminal format are encoded
-first, so a newline cannot leave the span. Headings, sentences, and
-rule ids are ordinary text. Rule ids match `[a-z0-9][a-z0-9-]{0,63}`.
+Each entry is one list item. The first line is the package, the kind,
+and the role. The sentence and the rule line are indented under it.
+The section heading already names the decision, so the item does not
+start with Deny, Warning, or Allow.
+
+A string from an SBOM is written only inside a code span, and so is a
+rule id. The span uses more backticks than the value contains, so a
+backtick in a name cannot end the span. The same characters as in the
+terminal format are encoded first, so a newline cannot leave the span.
+An empty value is the word `(empty)`, not a code span. Headings and
+sentences are ordinary text. Rule ids match `[a-z0-9][a-z0-9-]{0,63}`.
 
 GitHub comments stop at 65,536 characters. The Markdown report stays
 under 60,000 Unicode scalars (`MARKDOWN_CHAR_BUDGET`). When it would be

@@ -10,7 +10,9 @@ use crate::diff::{Change, ChangeCounts, ChangeKind, Diff};
 use crate::model::{ComponentKey, DependencyRole, VersionId, Warning, WarningKind};
 use crate::policy::{Decision, DocumentCondition, Mode, Subject, Unit, Verdict};
 
-use super::explain::{change_phrases, condition_phrases, root_phrases};
+use super::explain::{
+    change_phrases, condition_phrases, human_change_phrases, human_root_phrases, root_phrases,
+};
 use super::json::{
     ChangeCountsJson, CountsJson, DecisionCountsJson, DetailJson, GateJson, JsonReport, ToolJson,
     UnitJson, UnitParts, WarningsJson, change_detail, decision_id, outcome_id, raw_message,
@@ -222,16 +224,18 @@ fn change_built(
     let label = package_label(key, version);
     let id = identity(key, Some(version));
     let role = change.map(reviewed_role);
-    let phrases = change.map_or_else(
+    let spoken = change.map_or_else(
         || vec![Phrase::Text("Change is missing from the diff.".to_owned())],
         change_phrases,
     );
+    let phrases = change.map_or_else(|| spoken.clone(), human_change_phrases);
     let detail = change.map_or(DetailJson::Condition, change_detail);
     finish(Finish {
         label: &label,
         kind: Some(kind.id()),
         role,
         phrases,
+        spoken,
         id: &id,
         json_kind: Some(kind.id().to_owned()),
         condition: None,
@@ -248,13 +252,20 @@ fn document_built(
     unit: Option<&Unit>,
     slot: Slot,
 ) -> Built {
-    let phrases = if condition == DocumentCondition::RootChanged {
+    let spoken = if condition == DocumentCondition::RootChanged {
         diff.root.as_ref().map_or_else(
             || vec![Phrase::Text("The project component changed.".to_owned())],
             root_phrases,
         )
     } else {
         condition_phrases(condition.id(), warning_kind(condition))
+    };
+    let phrases = if condition == DocumentCondition::RootChanged {
+        diff.root
+            .as_ref()
+            .map_or_else(|| spoken.clone(), human_root_phrases)
+    } else {
+        spoken.clone()
     };
     let detail = if condition == DocumentCondition::RootChanged {
         DetailJson::RootChanged
@@ -284,6 +295,7 @@ fn document_built(
         kind: Some(condition.id()),
         role: None,
         phrases,
+        spoken,
         id: &id,
         json_kind: None,
         condition: Some(condition.id().to_owned()),
@@ -299,6 +311,7 @@ struct Finish<'a> {
     kind: Option<&'a str>,
     role: Option<DependencyRole>,
     phrases: Vec<Phrase>,
+    spoken: Vec<Phrase>,
     id: &'a Identity,
     json_kind: Option<String>,
     condition: Option<String>,
@@ -314,6 +327,7 @@ fn finish(input: Finish<'_>) -> Built {
         kind,
         role,
         phrases,
+        spoken,
         id,
         json_kind,
         condition,
@@ -330,7 +344,7 @@ fn finish(input: Finish<'_>) -> Built {
     let effective = unit.map(|unit| decision_id(unit.effective));
     let rules_vec = unit.map_or_else(Vec::new, |unit| unit.rules.clone());
     let used_default = unit.is_some_and(|unit| unit.used_default);
-    let message = raw_message(&phrases);
+    let message = raw_message(&spoken);
     Built {
         rank: slot.rank,
         order: slot.order,
@@ -481,53 +495,31 @@ fn header_lines(
         )));
     }
     lines.push(Line::Text(change_line(&diff.summary.counts)));
-    if diff.is_empty() {
-        lines.push(Line::Text("No dependency changes.".to_owned()));
-    }
     lines
 }
 
 fn change_line(counts: &ChangeCounts) -> String {
     let parts = [
-        counted(counts.added, "added change", "added changes"),
-        counted(counts.removed, "removed change", "removed changes"),
-        counted(
-            counts.version_changed,
-            "version-changed change",
-            "version-changed changes",
-        ),
-        counted(
-            counts.license_changed,
-            "license-changed change",
-            "license-changed changes",
-        ),
-        counted(
-            counts.supplier_changed,
-            "supplier-changed change",
-            "supplier-changed changes",
-        ),
-        counted(
-            counts.hash_changed,
-            "hash-changed change",
-            "hash-changed changes",
-        ),
-        counted(
-            counts.hash_coverage_changed,
-            "hash-coverage-changed change",
-            "hash-coverage-changed changes",
-        ),
-        counted(
-            counts.scope_changed,
-            "scope-changed change",
-            "scope-changed changes",
-        ),
-        counted(
-            counts.role_changed,
-            "role-changed change",
-            "role-changed changes",
-        ),
+        (counts.added, "added"),
+        (counts.removed, "removed"),
+        (counts.version_changed, "version-changed"),
+        (counts.license_changed, "license-changed"),
+        (counts.supplier_changed, "supplier-changed"),
+        (counts.hash_changed, "hash-changed"),
+        (counts.hash_coverage_changed, "hash-coverage-changed"),
+        (counts.scope_changed, "scope-changed"),
+        (counts.role_changed, "role-changed"),
     ];
-    format!("Changes: {}", parts.join(", "))
+    let shown: Vec<String> = parts
+        .into_iter()
+        .filter(|(count, _)| *count > 0)
+        .map(|(count, name)| format!("{count} {name}"))
+        .collect();
+    if shown.is_empty() {
+        "No dependency changes.".to_owned()
+    } else {
+        format!("Changes: {}", shown.join(", "))
+    }
 }
 
 fn notes_of(diff: &Diff) -> Vec<Vec<Phrase>> {
@@ -538,16 +530,18 @@ fn notes_of(diff: &Diff) -> Vec<Vec<Phrase>> {
                 .to_owned(),
         )]);
     }
-    notes.push(warning_note("new", &diff.warnings.new));
-    notes.push(warning_note("old", &diff.warnings.old));
+    if let Some(note) = warning_note("new", &diff.warnings.new) {
+        notes.push(note);
+    }
+    if let Some(note) = warning_note("old", &diff.warnings.old) {
+        notes.push(note);
+    }
     notes
 }
 
-fn warning_note(side: &str, warnings: &[Warning]) -> Vec<Phrase> {
+fn warning_note(side: &str, warnings: &[Warning]) -> Option<Vec<Phrase>> {
     if warnings.is_empty() {
-        return vec![Phrase::Text(format!(
-            "Warnings in the {side} document: none."
-        ))];
+        return None;
     }
     let mut grouped: BTreeMap<WarningKind, Vec<&Warning>> = BTreeMap::new();
     for warning in warnings {
@@ -594,7 +588,7 @@ fn warning_note(side: &str, warnings: &[Warning]) -> Vec<Phrase> {
         phrases.push(Phrase::Text(")".to_owned()));
     }
     phrases.push(Phrase::Text(".".to_owned()));
-    phrases
+    Some(phrases)
 }
 
 fn weakened_denials(verdict: &Verdict) -> u64 {

@@ -144,7 +144,7 @@ fn assert_consistent(
         return Err("a judged report contains the report-only sentence".to_owned());
     }
     let terminal_denied = terminal.matches("\nDeny ").count();
-    let markdown_denied = markdown.matches("Deny ").count();
+    let markdown_denied = denied_list_items(markdown);
     if verdict.is_some() && (terminal_denied != denied || markdown_denied != denied) {
         return Err(format!(
             "denied counts differ: json {denied}, terminal {terminal_denied}, markdown {markdown_denied}"
@@ -692,12 +692,23 @@ fn walk<'a>(node: &'a AstNode<'a>, literals: &mut Vec<String>) -> Result<(), Str
             }
         }
         NodeValue::Code(code) => literals.push(code.literal.clone()),
+        // List and item nodes are the entry format. Anything else that is
+        // not a link, a table, or unexpected HTML is report prose.
         _ => {}
     }
     for child in node.children() {
         walk(child, literals)?;
     }
     Ok(())
+}
+
+fn denied_list_items(markdown: &str) -> usize {
+    let Some(section) = markdown.split("## Denied\n").nth(1) else {
+        return 0;
+    };
+    let body = section.split("\n## ").next().unwrap_or(section);
+    let body = body.split("\n<details>").next().unwrap_or(body);
+    body.lines().filter(|line| line.starts_with("- ")).count()
 }
 
 fn heading_text<'a>(node: &'a AstNode<'a>) -> String {

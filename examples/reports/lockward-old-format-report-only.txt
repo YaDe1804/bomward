@@ -2,7 +2,7 @@ bomward 0.1.0
 No policy was applied.
 Exit code: 0
 Mode: report-only
-Changes: 3 added changes, 1 removed change, 2 version-changed changes, 1 license-changed change, 0 supplier-changed changes, 0 hash-changed changes, 0 hash-coverage-changed changes, 1 scope-changed change, 0 role-changed changes
+Changes: 3 added, 1 removed, 2 version-changed, 1 license-changed, 1 scope-changed
 
 Changes
 
@@ -13,24 +13,23 @@ npm devkit@1.0.0 scope-changed direct
 Scopes added: required. Removed: excluded.
 
 npm fresh@1.0.0 added direct
-Added. Introduced by npm review-app@1.0.0. Path from the root: npm review-app@1.0.0, npm fresh@1.0.0. Licenses: MIT. Suppliers: none. Scopes: required. Hash algorithms: SHA-256. Hash contents: abcd.
+Added. Licenses: MIT. Suppliers: none. Scopes: required. Hash algorithms: SHA-256.
 
 npm gone@1.0.0 removed unknown
-Removed. Licenses: MIT. Suppliers: none. Scopes: required. Hash algorithms: SHA-256. Hash contents: abcd.
+Removed. Licenses: MIT. Suppliers: none. Scopes: required. Hash algorithms: SHA-256.
 
 npm licensed@1.0.0 license-changed direct
 Licenses added: Apache-2.0. Removed: MIT.
 
 npm multi@3.0.0 added transitive
-Added. Introduced by npm fresh@1.0.0. Path from the root: npm review-app@1.0.0, npm fresh@1.0.0, npm multi@3.0.0. Licenses: MIT. Suppliers: none. Scopes: required. Hash algorithms: SHA-256. Hash contents: abcd.
+Added. Introduced by npm fresh@1.0.0. Path from the root: npm review-app@1.0.0, npm fresh@1.0.0, npm multi@3.0.0. Licenses: MIT. Suppliers: none. Scopes: required. Hash algorithms: SHA-256.
 
 npm nested-new@1.0.0 added transitive
-Added. Introduced by npm fresh@1.0.0. Path from the root: npm review-app@1.0.0, npm fresh@1.0.0, npm nested-new@1.0.0. Licenses: MIT. Suppliers: none. Scopes: required. Hash algorithms: SHA-256. Hash contents: abcd.
+Added. Introduced by npm fresh@1.0.0. Path from the root: npm review-app@1.0.0, npm fresh@1.0.0, npm nested-new@1.0.0. Licenses: MIT. Suppliers: none. Scopes: required. Hash algorithms: SHA-256.
 
 npm rolled@1.0.0 version-changed direct
 Version changed from 2.0.0 to 1.0.0 (downgrade).
 
 Notes
 Roles were not compared because at least one document has no dependency graph.
-Warnings in the new document: none.
 Warnings in the old document: 1 role-unknown warning (no package).

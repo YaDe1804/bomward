@@ -20,7 +20,7 @@ That command exits 1. The Markdown it writes is
 The opening of that report:
 
 ```markdown
-# bomward 0.1.0
+# bomward review
 
 **Result:** Deny
 
@@ -30,13 +30,13 @@ The opening of that report:
 
 **Decisions:** 1 denial, 8 warnings, 0 allowed
 
+**Changes:** 3 added, 1 removed, 2 version-changed, 1 license-changed, 1 scope-changed, 1 role-changed
+
 ## Denied
 
-Deny `npm` `rolled`@`1.0.0` version-changed direct
-
-Version changed from `2.0.0` to `1.0.0` (downgrade).
-
-Rules: no-downgrade.
+- `npm` `rolled`@`1.0.0` version-changed direct
+  Version changed from `2.0.0` to `1.0.0` (downgrade).
+  Rules: `no-downgrade`.
 ```
 
 Omit `--policy` for a report that does not judge the change. That run

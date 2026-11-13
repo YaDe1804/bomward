@@ -563,6 +563,7 @@ fn walk<'a>(node: &'a AstNode<'a>, literals: &mut Vec<String>) -> Result<(), Str
             }
         }
         NodeValue::Code(code) => literals.push(code.literal.clone()),
+        // List items are the entry format.
         _ => {}
     }
     for child in node.children() {

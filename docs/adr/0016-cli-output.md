@@ -20,7 +20,11 @@ bomward diff <OLD> <NEW> [--policy <FILE>] [--format <terminal|markdown|json>] [
 The default format is `terminal`. The report is written to stdout. With
 `--output`, those same bytes are written to that file and stdout is
 empty. The file is created or truncated. Parent directories are not
-created. A directory path is an error.
+created. A directory path is an error. An `--output` path that is one
+of the two SBOM files is rejected before either file is opened for
+writing: the process exits 2, names `OLD` or `NEW`, and leaves that
+file unchanged. The check compares the files, so a different spelling
+of the same path is the same refusal.
 
 Diagnostics go to stderr, prefixed with `error: `. The report itself is
 never written to stderr.
@@ -31,7 +35,7 @@ Exit codes stay those of ADR 0007:
 | --- | --- |
 | 0 | The report was written and the effective result is not `deny`. Report-only is 0. |
 | 1 | The report was written and the effective result is `deny`. The report is complete. |
-| 2 | Usage, a file that cannot be read, a rejected SBOM, a limit, a rejected policy, or a write error. No report is written. |
+| 2 | Usage, a file that cannot be read, a rejected SBOM, a limit, a rejected policy, an output path that is one of the two inputs, or a write error. No report is written. |
 
 The message names the input. `OLD` and `NEW` are the two SBOM arguments.
 `policy` is the policy argument. The path is the argument string, not a

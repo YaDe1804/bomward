@@ -171,6 +171,36 @@ fn output_file_matches_stdout_and_a_second_run() -> Result<(), Box<dyn std::erro
 }
 
 #[test]
+fn output_refuses_to_replace_an_input() -> Result<(), Box<dyn std::error::Error>> {
+    let dir = scratch("output-guard")?;
+    let bytes = fs::read(repo("../bomward-core/tests/fixtures/minimal-1.6.json"))?;
+    fs::write(dir.join("old.json"), &bytes)?;
+    fs::write(dir.join("new.json"), &bytes)?;
+    for (target, which) in [
+        ("old.json", "OLD"),
+        ("new.json", "NEW"),
+        ("./old.json", "OLD"),
+    ] {
+        let output = bomward()
+            .current_dir(&dir)
+            .args(["diff", "old.json", "new.json", "--output", target])
+            .output()?;
+        let stderr = String::from_utf8(output.stderr)?;
+        assert_eq!(output.status.code(), Some(2), "{target}: {stderr}");
+        assert!(output.stdout.is_empty(), "{stderr}");
+        assert!(
+            stderr.starts_with(&format!(
+                "error: refusing to write the report over {which} {target}"
+            )),
+            "{stderr}"
+        );
+    }
+    assert_eq!(fs::read(dir.join("old.json"))?, bytes);
+    assert_eq!(fs::read(dir.join("new.json"))?, bytes);
+    Ok(())
+}
+
+#[test]
 fn error_classes_exit_2_without_a_report() -> Result<(), Box<dyn std::error::Error>> {
     let dir = scratch("errors")?;
     let missing = dir.join("missing.json");
