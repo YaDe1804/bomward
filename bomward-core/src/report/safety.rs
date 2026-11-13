@@ -188,6 +188,41 @@ fn push_rule_combinations(batch: &mut Batch) -> Result<(), String> {
     Ok(())
 }
 
+#[test]
+fn every_invisible_range_is_visible_in_text_and_raw_in_json() -> Result<(), String> {
+    for &(start, end) in super::escape::ENCODED_RANGES {
+        check_invisible(start)?;
+        if end != start {
+            check_invisible(end)?;
+        }
+    }
+    Ok(())
+}
+
+fn check_invisible(code: u32) -> Result<(), String> {
+    let ch = char::from_u32(code).ok_or_else(|| format!("not a scalar {code:X}"))?;
+    let mut slots = Slots::named();
+    slots.license = ch.to_string();
+    let (diff, verdict) = slots.build();
+    let prepared = prepare(&diff, Some(&verdict), "0.1.0");
+    let markdown = super::markdown::render(&prepared);
+    let terminal = super::terminal::render(&prepared);
+    let json = super::render_json(&prepared.json);
+    let escaped = format!("\\u{{{code:04X}}}");
+    let markdown_clean = markdown.lines().all(|line| !line.contains(ch));
+    let terminal_clean = terminal.lines().all(|line| !line.contains(ch));
+    if !markdown.contains(&escaped) || !markdown_clean {
+        return Err(format!("markdown kept U+{code:X} raw"));
+    }
+    if !terminal.contains(&escaped) || !terminal_clean {
+        return Err(format!("terminal kept U+{code:X} raw"));
+    }
+    if json.contains(&escaped) || (code >= 0x20 && !json.contains(ch)) {
+        return Err(format!("JSON changed U+{code:X}"));
+    }
+    Ok(())
+}
+
 fn name_case(name: &str, group: &str, version: &str, license: &str, supplier: &str) -> Slots {
     let mut slots = Slots::named();
     slots.group = Some(group.to_owned());

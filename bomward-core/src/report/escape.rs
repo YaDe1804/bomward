@@ -23,18 +23,71 @@ pub(crate) struct ShownValue {
     pub(crate) total: Option<usize>,
 }
 
-/// `true` when `ch` can change terminal state or leave a line.
+/// Inclusive ranges encoded before text reaches a terminal or Markdown.
+///
+/// Unicode 17.0.0 (`DerivedGeneralCategory.txt` and
+/// `DerivedCoreProperties.txt`, 2025-07-30). The union of C0, DEL, C1,
+/// line and paragraph separators, General Category `Cf`,
+/// `Default_Ignorable_Code_Point`, and every `Zs` space except U+0020.
+/// Visible lookalikes are not in this table.
+pub(crate) const ENCODED_RANGES: &[(u32, u32)] = &[
+    (0x0000, 0x001F),
+    (0x007F, 0x009F),
+    (0x00A0, 0x00A0),
+    (0x00AD, 0x00AD),
+    (0x034F, 0x034F),
+    (0x0600, 0x0605),
+    (0x061C, 0x061C),
+    (0x06DD, 0x06DD),
+    (0x070F, 0x070F),
+    (0x0890, 0x0891),
+    (0x08E2, 0x08E2),
+    (0x115F, 0x1160),
+    (0x1680, 0x1680),
+    (0x17B4, 0x17B5),
+    (0x180B, 0x180F),
+    (0x2000, 0x200F),
+    (0x2028, 0x202F),
+    (0x205F, 0x205F),
+    (0x2060, 0x206F),
+    (0x3000, 0x3000),
+    (0x3164, 0x3164),
+    (0xFE00, 0xFE0F),
+    (0xFEFF, 0xFEFF),
+    (0xFFA0, 0xFFA0),
+    (0xFFF0, 0xFFFB),
+    (0x110BD, 0x110BD),
+    (0x110CD, 0x110CD),
+    (0x13430, 0x1343F),
+    (0x1BCA0, 0x1BCA3),
+    (0x1D173, 0x1D17A),
+    (0xE0000, 0xE0FFF),
+];
+
+/// `true` when `ch` is invisible or can change terminal state.
 pub(crate) fn affects_terminal(ch: char) -> bool {
     let code = u32::from(ch);
-    code <= 0x1F
-        || (0x7F..=0x9F).contains(&code)
-        || matches!(
-            code,
-            0x061C | 0x200E | 0x200F | 0x2028 | 0x2029 | 0x202A..=0x202E | 0x2066..=0x2069
-        )
+    let mut low = 0usize;
+    let mut high = ENCODED_RANGES.len();
+    while low < high {
+        let mid = low + (high - low) / 2;
+        let Some(&(start, end)) = ENCODED_RANGES.get(mid) else {
+            return false;
+        };
+        if code < start {
+            high = mid;
+        } else if code > end {
+            low = mid + 1;
+        } else {
+            return true;
+        }
+    }
+    false
 }
 
-/// Encode terminal-affecting characters as `\u{XXXX}`.
+/// Encode invisible and terminal-affecting characters as `\u{XXXX}`.
+///
+/// The hex width is at least four digits, so a tag character is not cut.
 pub(crate) fn encode_controls(input: &str) -> String {
     let mut out = String::with_capacity(input.len());
     for ch in input.chars() {
@@ -127,7 +180,25 @@ mod tests {
             "a\\u{000A}b\\u{001B}c\\u{007F}d\\u{0085}e\\u{202E}f\\u{2066}"
         );
         assert!(affects_terminal('\u{202E}'));
+        assert!(affects_terminal('\u{00A0}'));
+        assert!(affects_terminal('\u{034F}'));
         assert!(!affects_terminal('A'));
+        assert!(!affects_terminal(' '));
+    }
+
+    #[test]
+    fn every_encoded_range_is_visible() -> Result<(), String> {
+        for &(start, end) in super::ENCODED_RANGES {
+            for code in [start, end] {
+                let ch = char::from_u32(code).ok_or_else(|| format!("not a scalar {code:X}"))?;
+                let encoded = encode_controls(&ch.to_string());
+                let expected = format!("\\u{{{code:04X}}}");
+                if encoded != expected || !affects_terminal(ch) {
+                    return Err(format!("{code:X} encoded as {encoded}"));
+                }
+            }
+        }
+        Ok(())
     }
 
     #[test]

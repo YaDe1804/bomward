@@ -13,9 +13,9 @@ Markdown still autolinks a bare URL, turns `@name` into a notification,
 and links `#123` and a 40-character commit hash. None of those characters
 are in that list. A code span is the construct that suppresses all three.
 
-The same SBOM string can also move a terminal cursor. C1 controls
-(U+0080–U+009F) and bidirectional controls do that even after C0 and
-DEL are encoded.
+The same SBOM string can also move a terminal cursor, or make two names
+look identical. C1 controls (U+0080–U+009F), bidirectional controls, and
+other invisible characters do that even after C0 and DEL are encoded.
 
 ## Decision
 
@@ -32,13 +32,20 @@ rendered). Those ids are values, written the same way as SBOM strings.
 ### Terminal
 
 Plain text, no ANSI sequences, no wrapping to a terminal width, LF only.
-Encode these characters as `\u{XXXX}` (four uppercase hex digits):
+Encode the following as `\u{XXXX}` (at least four uppercase hex digits),
+from one range table taken from Unicode 17.0.0:
 
-- U+0000–U+001F and U+007F
-- U+0080–U+009F (C1)
-- U+061C, U+200E, U+200F
-- U+2028, U+2029, U+202A–U+202E
-- U+2066–U+2069
+- C0, DEL, and C1 (U+0000–U+001F, U+007F, U+0080–U+009F)
+- General Category `Cf`, including bidi controls and tag characters
+- `Default_Ignorable_Code_Point`, including U+034F, the Hangul fillers,
+  variation selectors, and U+E0000–U+E0FFF
+- every space except U+0020 (U+00A0, U+1680, U+2000–U+200A, U+202F,
+  U+205F, U+3000)
+- U+2028 and U+2029
+
+Two package names that differ only by an invisible character must not
+look the same. Characters that are visible and merely look alike
+(homoglyphs) are not encoded.
 
 A value longer than 256 Unicode scalars is cut at 256, then an ellipsis
 and the total number of scalars are added. JSON is not cut.

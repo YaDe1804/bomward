@@ -54,13 +54,16 @@ strings are copied into Markdown that GitHub renders, and into terminal
 logs that interpret control characters.
 
 Mitigation, from [ADR 0015](adr/0015-report-formats-and-escaping.md):
-Markdown writes every SBOM string inside a code span, and encodes C0,
-DEL, C1, and bidirectional controls as `\u{XXXX}` before the span is
-built, so a newline cannot leave the span. The only HTML the report
-emits is `<details>` and `<summary>`. The terminal format encodes the
-same characters and emits no ANSI color. JSON uses one JSON string
-encoding and does not add a second escape layer. The report does not
-include a timestamp, a local path, or a host name.
+Markdown writes every SBOM string inside a code span. Before that span
+is built, and in the terminal format, invisible characters are written
+as `\u{XXXX}`: C0, DEL, C1, format characters, default-ignorable
+characters, and every space except U+0020. A newline cannot leave the
+span, and two names that differ only by an invisible character do not
+look the same. Visible lookalikes (homoglyphs) are not covered. The
+only HTML the report emits is `<details>` and `<summary>`. The terminal
+format emits no ANSI color. JSON uses one JSON string encoding and does
+not add a second escape layer. The report does not include a timestamp,
+a local path, or a host name.
 
 ### Path confusion
 
