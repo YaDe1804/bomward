@@ -24,6 +24,7 @@ jobs:
       - name: Rust toolchain
         uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
       - name: Review with the strict policy
+        id: review
         uses: ./
         with:
           sbom: bomward-core/tests/fixtures/lockward-new.cdx.json
@@ -35,7 +36,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -F -q "Result: Deny" "$GITHUB_STEP_SUMMARY"
+          grep -F -q "Result: Deny" "${{ steps.review.outputs.terminal }}"
 
   report-only:
     name: report-only
@@ -50,6 +51,7 @@ jobs:
       - name: Rust toolchain
         uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
       - name: Review without a policy
+        id: review
         uses: ./
         with:
           sbom: bomward-core/tests/fixtures/lockward-new.cdx.json
@@ -59,4 +61,4 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -F -q "No policy was applied." "$GITHUB_STEP_SUMMARY"
+          grep -F -q "No policy was applied." "${{ steps.review.outputs.terminal }}"

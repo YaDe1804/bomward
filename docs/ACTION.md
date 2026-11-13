@@ -62,8 +62,10 @@ segment, `.`, or `..` is rejected with exit 2.
 | Output | Meaning |
 | --- | --- |
 | `exit-code` | The bomward verdict: 0, 1, or 2. With `fail-on-deny: false` the step can exit 0 while this output is still 1. |
+| `terminal` | Path of the terminal report file. A later step can read this path; the job summary of the Action step is not visible to the next step. |
+| `markdown` | Path of the Markdown report file, the same text the comment uses. |
 
-The terminal report is appended to `$GITHUB_STEP_SUMMARY`. The JSON
+The terminal report is also appended to the Action step's `$GITHUB_STEP_SUMMARY`. The JSON
 report is uploaded as the artifact `bomward-report-<job>`. The comment
 body is the Markdown report. An existing comment is the one whose body
 contains `<!-- bomward-review -->`; the Action updates that comment

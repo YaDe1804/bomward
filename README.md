@@ -88,6 +88,11 @@ jobs:
 `v0.1.0` is the default pin. That tag is not published yet. Until it
 exists, a foreign repository cannot download the binary.
 
+The step outputs `exit-code`, `terminal`, and `markdown`. `terminal` and
+`markdown` are the paths of those report files, so a later step can read
+the review. The job summary written during the Action step stays on that
+step.
+
 A fork pull request triggered by `pull_request` gets a token that cannot
 write comments. The Action writes the report to the job summary, keeps
 the verdict, and does not fail because the comment was skipped. A

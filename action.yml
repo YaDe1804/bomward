@@ -46,6 +46,12 @@ outputs:
   exit-code:
     description: "bomward verdict (0 pass or report-only, 1 deny, 2 error)"
     value: ${{ steps.gate.outputs.exit-code }}
+  terminal:
+    description: "Path to the terminal report"
+    value: ${{ steps.gate.outputs.terminal }}
+  markdown:
+    description: "Path to the Markdown report"
+    value: ${{ steps.gate.outputs.markdown }}
 
 runs:
   using: composite
@@ -121,6 +127,8 @@ runs:
         if [ -n "${GITHUB_OUTPUT:-}" ]; then
           printf 'exit-code=%s\n' "$verdict" >>"$GITHUB_OUTPUT"
           printf 'json=%s\n' "$BOMWARD_JSON" >>"$GITHUB_OUTPUT"
+          printf 'terminal=%s\n' "$BOMWARD_TERMINAL" >>"$GITHUB_OUTPUT"
+          printf 'markdown=%s\n' "$BOMWARD_MARKDOWN" >>"$GITHUB_OUTPUT"
         fi
         if [ "$BOMWARD_FAIL_ON_DENY" = "true" ]; then
           exit "$verdict"
