@@ -1,0 +1,56 @@
+name: Fuzz
+
+on:
+  pull_request:
+  schedule:
+    - cron: "0 4 * * *"
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: fuzz-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  libfuzzer:
+    name: libfuzzer
+    runs-on: ubuntu-latest
+    env:
+      FUZZ_SECONDS: ${{ github.event_name == 'schedule' && '600' || '60' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249
+        with:
+          toolchain: nightly
+      - name: Cache cargo-fuzz
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cargo/bin/cargo-fuzz
+          key: cargo-fuzz-0.13.2-${{ runner.os }}
+      - name: Install cargo-fuzz
+        run: |
+          if [ ! -x "${HOME}/.cargo/bin/cargo-fuzz" ]; then
+            cargo install cargo-fuzz --version 0.13.2 --locked
+          fi
+      - name: Fuzz decode
+        id: decode
+        working-directory: fuzz
+        continue-on-error: true
+        run: cargo fuzz run decode -- -max_total_time="${FUZZ_SECONDS}"
+      - name: Fuzz policy
+        id: policy
+        working-directory: fuzz
+        continue-on-error: true
+        run: cargo fuzz run policy -- -max_total_time="${FUZZ_SECONDS}"
+      - name: Upload crash artifacts
+        if: steps.decode.outcome == 'failure' || steps.policy.outcome == 'failure'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fuzz-artifacts
+          path: fuzz/artifacts
+          if-no-files-found: ignore
+      - name: Fail when a target crashed
+        if: steps.decode.outcome == 'failure' || steps.policy.outcome == 'failure'
+        run: exit 1
