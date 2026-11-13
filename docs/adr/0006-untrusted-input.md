@@ -1,6 +1,6 @@
 # ADR 0006 — Untrusted input
 
-- Status: accepted
+- Status: accepted, amended by [ADR 0015](0015-report-formats-and-escaping.md)
 - Date: 2026-11-11
 
 ## Context
@@ -62,7 +62,12 @@ bomward is static.
 - Do not write a SBOM string into terminal or Markdown output unchanged.
   Encode U+0000–U+001F and U+007F as `\u{XXXX}` (four uppercase hex
   digits). That includes tab, newline, and ESC.
-  In Markdown, also escape `` \ ` * _ { } [ ] ( ) # + - . ! | < > ``.
+  Markdown used to backslash-escape `` \ ` * _ { } [ ] ( ) # + - . ! | < > ``.
+  That list does not stop GitHub from linking a bare URL, notifying
+  `@name`, or linking `#123` and a commit hash.
+  [ADR 0015](0015-report-formats-and-escaping.md) replaces that rule:
+  untrusted text in Markdown is written only inside a code span, and the
+  terminal encoding also covers C1 and bidirectional controls.
 - JSON output uses JSON string encoding and no second escape layer.
 - The terminal format emits no ANSI color sequences of its own.
 - Fixtures are inert documents written for the tests. No malware
