@@ -152,13 +152,16 @@ fn run_diff(
     limits: (u64, u64, u32),
 ) -> Result<u8, CliError> {
     let limits = Limits::new(limits.0, limits.1, limits.2).map_err(message)?;
+    let policy = match policy {
+        Some(path) => Some(read_policy(path)?),
+        None => None,
+    };
     let old_document = read_document("OLD", old, &limits)?;
     let new_document = read_document("NEW", new, &limits)?;
     let diff = bomward_core::diff::diff(&old_document, &new_document);
-    let verdict = match policy {
-        Some(path) => Some(bomward_core::policy::evaluate(&read_policy(path)?, &diff)),
-        None => None,
-    };
+    let verdict = policy
+        .as_ref()
+        .map(|policy| bomward_core::policy::evaluate(policy, &diff));
     let text = render(&diff, verdict.as_ref(), report_format(format));
     let code = verdict
         .as_ref()

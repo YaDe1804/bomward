@@ -120,15 +120,31 @@ struct Slot {
 }
 
 fn judged_entries(diff: &Diff, verdict: &Verdict) -> Vec<Built> {
+    let changes = change_index(diff);
     let mut built = Vec::new();
     for (order, unit) in verdict.units.iter().enumerate() {
-        built.push(judged_entry(diff, unit, order));
+        built.push(judged_entry(diff, &changes, unit, order));
     }
     built.sort_by_key(|entry| (entry.rank, entry.order));
     built
 }
 
-fn judged_entry(diff: &Diff, unit: &Unit, order: usize) -> Built {
+fn change_index(diff: &Diff) -> BTreeMap<(&ComponentKey, &VersionId, ChangeKind), &Change> {
+    let mut index = BTreeMap::new();
+    for change in &diff.changes {
+        index
+            .entry((&change.key, &change.version, change.kind))
+            .or_insert(change);
+    }
+    index
+}
+
+fn judged_entry<'a>(
+    diff: &'a Diff,
+    changes: &BTreeMap<(&'a ComponentKey, &'a VersionId, ChangeKind), &'a Change>,
+    unit: &'a Unit,
+    order: usize,
+) -> Built {
     let rank = decision_rank(unit.effective);
     let group_title = match unit.effective {
         Decision::Deny => "Denied",
@@ -137,9 +153,7 @@ fn judged_entry(diff: &Diff, unit: &Unit, order: usize) -> Built {
     };
     match &unit.subject {
         Subject::Change { key, version, kind } => {
-            let change = diff.changes.iter().find(|change| {
-                change.key == *key && change.version == *version && change.kind == *kind
-            });
+            let change = changes.get(&(key, version, *kind)).copied();
             change_built(
                 change,
                 key,

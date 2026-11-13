@@ -325,6 +325,28 @@ fn limit_policy_and_write(
 }
 
 #[test]
+fn a_bad_policy_is_reported_before_the_documents() -> Result<(), Box<dyn std::error::Error>> {
+    let output = bomward()
+        .args([
+            "diff",
+            "missing-old.json",
+            "missing-new.json",
+            "--policy",
+            "missing-policy.yaml",
+        ])
+        .output()?;
+    let stderr = String::from_utf8(output.stderr)?;
+    assert_eq!(output.status.code(), Some(2), "{stderr}");
+    assert!(
+        stderr.starts_with("error: failed to read policy missing-policy.yaml:"),
+        "{stderr}"
+    );
+    assert!(!stderr.contains("missing-old.json"), "{stderr}");
+    assert_eq!(output.stdout, b"");
+    Ok(())
+}
+
+#[test]
 fn a_closed_stdout_pipe_keeps_a_deny() -> Result<(), Box<dyn std::error::Error>> {
     let dir = scratch("pipe-deny")?;
     let count = 12_000;
