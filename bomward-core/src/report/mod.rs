@@ -14,6 +14,9 @@ mod markdown;
 mod terminal;
 mod text;
 
+#[cfg(test)]
+mod safety;
+
 use assemble::prepare;
 use json::JsonReport;
 

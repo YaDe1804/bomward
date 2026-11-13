@@ -4,6 +4,12 @@
 
 use std::fmt::Write as _;
 
+/// Word the terminal and Markdown use for a value with no characters.
+///
+/// An empty code span is two backticks. `CommonMark` reads that as an opening
+/// fence, so the next span can close the wrong one.
+pub(crate) const EMPTY_VALUE: &str = "(empty)";
+
 /// Longest untrusted value written into terminal or Markdown text.
 ///
 /// JSON keeps the original string. The count is Unicode scalars.
@@ -59,18 +65,40 @@ pub(crate) fn show_value(raw: &str) -> ShownValue {
     }
 }
 
+/// Write one value. An empty value is [`EMPTY_VALUE`], not a code span.
+pub(crate) fn push_value(out: &mut String, value: &str, span: bool) {
+    if value.is_empty() {
+        out.push_str(EMPTY_VALUE);
+        return;
+    }
+    let shown = show_value(value);
+    if span {
+        out.push_str(&code_span(&shown.text));
+    } else {
+        out.push_str(&shown.text);
+    }
+    if let Some(total) = shown.total {
+        let _ = write!(out, " ({total} characters)");
+    }
+}
+
 /// Wrap `escaped` in a `CommonMark` code span.
 ///
 /// The fence is longer than any backtick run in `escaped`. A value that
-/// starts or ends with a backtick is padded with a space.
+/// starts or ends with a backtick or a space is padded with one space.
+/// `CommonMark` drops one leading and one trailing space when a span is not
+/// entirely spaces, and a backtick run must not touch the fence.
 pub(crate) fn code_span(escaped: &str) -> String {
     let fence = "`".repeat(longest_backtick_run(escaped) + 1);
-    let pad = if escaped.starts_with('`') || escaped.ends_with('`') {
-        " "
-    } else {
-        ""
-    };
+    let pad = if needs_space_pad(escaped) { " " } else { "" };
     format!("{fence}{pad}{escaped}{pad}{fence}")
+}
+
+fn needs_space_pad(text: &str) -> bool {
+    if text.is_empty() || text.chars().all(|ch| ch == ' ') {
+        return false;
+    }
+    text.starts_with('`') || text.ends_with('`') || text.starts_with(' ') || text.ends_with(' ')
 }
 
 fn longest_backtick_run(text: &str) -> usize {
@@ -119,5 +147,12 @@ mod tests {
         let span = code_span("``a`");
         assert!(span.starts_with("```"));
         assert!(span.contains("``a`"));
+    }
+
+    #[test]
+    fn a_value_with_end_spaces_is_padded() {
+        assert_eq!(code_span(" / "), "`  /  `");
+        assert_eq!(code_span(" "), "` `");
+        assert_eq!(code_span("`"), "`` ` ``");
     }
 }

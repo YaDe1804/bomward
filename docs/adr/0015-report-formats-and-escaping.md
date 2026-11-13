@@ -25,7 +25,9 @@ ids are copied as the policy and the diff spell them.
 
 Untrusted text is every string that came from a SBOM: names, groups,
 versions, purl parts, licenses, suppliers, hash algorithms, and hash
-contents. Policy rule ids are configuration. They are trusted.
+contents. A policy file is foreign text as well. The report shows rule
+ids from that file and no other policy prose (a description is not
+rendered). Those ids are values, written the same way as SBOM strings.
 
 ### Terminal
 
@@ -45,12 +47,20 @@ and the total number of scalars are added. JSON is not cut.
 
 Untrusted text is written only inside a code span. The span uses enough
 backticks to exceed the longest backtick run in the value (CommonMark).
-A value that starts or ends with a backtick is padded with one space
-inside the fence. The characters listed for the terminal are encoded
-before the span is built, so a newline cannot leave the span.
+A value that starts or ends with a backtick or a space is padded with
+one space inside the fence. CommonMark otherwise joins the fence to a
+backtick, or drops one leading and one trailing space. A value that is
+only spaces is not padded: CommonMark keeps those spaces. The characters
+listed for the terminal are encoded before the span is built, so a
+newline cannot leave the span.
 
-Report prose (headings, sentences, rule ids) is ordinary text. The only
-HTML the report emits is `<details>` and `<summary>` around allowed
+A value with no characters is not a code span. Two backticks are an
+opening fence, and the next span can close the wrong fence, which puts
+a later value in the prose. Markdown and the terminal write the word
+`(empty)` instead. That word is report prose. JSON keeps `""`.
+
+Report prose (headings and sentences the report wrote) is ordinary text.
+The only HTML the report emits is `<details>` and `<summary>` around allowed
 entries and around the notes. Denied entries and warnings stay visible.
 
 `MARKDOWN_CHAR_BUDGET` is 60,000 Unicode scalars, under GitHub's 65,536

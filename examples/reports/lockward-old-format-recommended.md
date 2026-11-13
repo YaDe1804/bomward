@@ -18,19 +18,19 @@ Warning `npm` `devkit`@`1.0.0` scope-changed direct
 
 Scopes added: `required`. Removed: `excluded`.
 
-Rules: scope-becomes-required.
+Rules: `scope-becomes-required`.
 
 Warning `npm` `fresh`@`1.0.0` added direct
 
 Added. Introduced by `npm` `review-app`@`1.0.0`. Path from the root: `npm` `review-app`@`1.0.0`, `npm` `fresh`@`1.0.0`. Licenses: `MIT`. Suppliers: none. Scopes: `required`. Hash algorithms: `SHA-256`. Hash contents: `abcd`.
 
-Rules: new-direct.
+Rules: `new-direct`.
 
 Warning `npm` `rolled`@`1.0.0` version-changed direct
 
 Version changed from `2.0.0` to `1.0.0` (downgrade).
 
-Rules: no-downgrade.
+Rules: `no-downgrade`.
 
 <details>
 <summary>Allowed (6)</summary>

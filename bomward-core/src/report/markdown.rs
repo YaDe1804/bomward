@@ -2,10 +2,8 @@
 
 //! GitHub-flavored Markdown. Untrusted text is written only in code spans.
 
-use std::fmt::Write as _;
-
 use super::assemble::{Entry, Line, Prepared};
-use super::escape::{code_span, show_value};
+use super::escape::push_value;
 use super::text::{Phrase, counted};
 
 /// Upper bound on the Markdown comment, in Unicode scalars.
@@ -55,9 +53,9 @@ fn render_entry(entry: &Entry) -> String {
     out.push_str("\n\n");
     out.push_str(&render_phrases(&entry.phrases));
     out.push('\n');
-    if let Some(rules) = &entry.rules {
+    if !entry.rules.is_empty() {
         out.push('\n');
-        out.push_str(rules);
+        out.push_str(&render_phrases(&entry.rules));
         out.push('\n');
     }
     out.push('\n');
@@ -81,13 +79,7 @@ fn render_phrases(phrases: &[Phrase]) -> String {
     for phrase in phrases {
         match phrase {
             Phrase::Text(text) => out.push_str(text),
-            Phrase::Value(value) => {
-                let shown = show_value(value);
-                out.push_str(&code_span(&shown.text));
-                if let Some(total) = shown.total {
-                    let _ = write!(out, " ({total} characters)");
-                }
-            }
+            Phrase::Value(value) => push_value(&mut out, value, true),
         }
     }
     out

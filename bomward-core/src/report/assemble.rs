@@ -40,7 +40,7 @@ pub(crate) struct Group {
 pub(crate) struct Entry {
     pub(crate) heading: Vec<Phrase>,
     pub(crate) phrases: Vec<Phrase>,
-    pub(crate) rules: Option<String>,
+    pub(crate) rules: Vec<Phrase>,
 }
 
 pub(crate) enum Line {
@@ -309,7 +309,9 @@ fn finish(input: Finish<'_>) -> Built {
         subject,
     } = input;
     let heading = heading_phrases(unit.map(|unit| unit.effective), label, kind, role, subject);
-    let rules = unit.map(|unit| rules_line(&unit.rules, unit.used_default));
+    let rules = unit.map_or_else(Vec::new, |unit| {
+        rules_phrases(&unit.rules, unit.used_default)
+    });
     let configured = unit.map(|unit| decision_id(unit.configured));
     let effective = unit.map(|unit| decision_id(unit.effective));
     let rules_vec = unit.map_or_else(Vec::new, |unit| unit.rules.clone());
@@ -386,11 +388,19 @@ fn heading_phrases(
     phrases
 }
 
-fn rules_line(rules: &[String], used_default: bool) -> String {
+fn rules_phrases(rules: &[String], used_default: bool) -> Vec<Phrase> {
     if used_default {
-        return "Decision from default.".to_owned();
+        return vec![Phrase::Text("Decision from default.".to_owned())];
     }
-    format!("Rules: {}.", rules.join(", "))
+    let mut phrases = vec![Phrase::Text("Rules: ".to_owned())];
+    for (index, rule) in rules.iter().enumerate() {
+        if index > 0 {
+            phrases.push(Phrase::Text(", ".to_owned()));
+        }
+        phrases.push(Phrase::Value(rule.clone()));
+    }
+    phrases.push(Phrase::Text(".".to_owned()));
+    phrases
 }
 
 fn groups_of(entries: &[Built], judged: bool) -> Vec<Group> {

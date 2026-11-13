@@ -2,10 +2,8 @@
 
 //! Plain text. No ANSI color, no wrapping, LF line endings.
 
-use std::fmt::Write as _;
-
 use super::assemble::{Entry, Group, Line, Prepared};
-use super::escape::show_value;
+use super::escape::push_value;
 use super::text::Phrase;
 
 pub(crate) fn render(prepared: &Prepared) -> String {
@@ -43,8 +41,8 @@ fn push_group(out: &mut String, group: &Group) {
 fn push_entry(out: &mut String, entry: &Entry) {
     push_line(out, &render_phrases(&entry.heading));
     push_line(out, &render_phrases(&entry.phrases));
-    if let Some(rules) = &entry.rules {
-        push_line(out, rules);
+    if !entry.rules.is_empty() {
+        push_line(out, &render_phrases(&entry.rules));
     }
 }
 
@@ -59,13 +57,7 @@ fn render_phrases(phrases: &[Phrase]) -> String {
     for phrase in phrases {
         match phrase {
             Phrase::Text(text) => out.push_str(text),
-            Phrase::Value(value) => {
-                let shown = show_value(value);
-                out.push_str(&shown.text);
-                if let Some(total) = shown.total {
-                    let _ = write!(out, " ({total} characters)");
-                }
-            }
+            Phrase::Value(value) => push_value(&mut out, value, false),
         }
     }
     out

@@ -16,7 +16,7 @@ Warning `npm` `licensed`@`1.0.0` license-changed direct
 
 Licenses added: `Apache-2.0`. Removed: `MIT`.
 
-Rules: notice-apache.
+Rules: `notice-apache`.
 
 <details>
 <summary>Allowed (8)</summary>
