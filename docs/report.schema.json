@@ -1,0 +1,398 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/YaDe1804/bomward/docs/report.schema.json",
+  "title": "bomward report",
+  "description": "Public JSON report, report_version 1. The message field is a sentence and is not a contract. See ADR 0015.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "report_version",
+    "tool",
+    "policy_applied",
+    "notice",
+    "gate",
+    "counts",
+    "units",
+    "root",
+    "roles_comparable",
+    "warnings"
+  ],
+  "properties": {
+    "report_version": { "const": 1 },
+    "tool": { "$ref": "#/$defs/tool" },
+    "policy_applied": { "type": "boolean" },
+    "notice": { "type": ["string", "null"] },
+    "gate": { "$ref": "#/$defs/gate" },
+    "counts": { "$ref": "#/$defs/counts" },
+    "units": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/unit" }
+    },
+    "root": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/root" }] },
+    "roles_comparable": { "type": "boolean" },
+    "warnings": { "$ref": "#/$defs/warnings" }
+  },
+  "$defs": {
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "const": "bomward" },
+        "version": { "type": "string" }
+      }
+    },
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "configured", "effective", "weakened_denials", "exit_code"],
+      "properties": {
+        "mode": { "enum": ["report-only", "warn", "enforce"] },
+        "configured": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/outcome" }] },
+        "effective": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/outcome" }] },
+        "weakened_denials": { "type": "integer", "minimum": 0 },
+        "exit_code": { "enum": [0, 1] }
+      }
+    },
+    "outcome": { "enum": ["pass", "warn", "deny"] },
+    "decision": { "enum": ["allow", "warn", "deny"] },
+    "role": { "enum": ["root", "direct", "transitive", "unknown"] },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decisions", "changes"],
+      "properties": {
+        "decisions": { "$ref": "#/$defs/decisionCounts" },
+        "changes": { "$ref": "#/$defs/changeCounts" }
+      }
+    },
+    "decisionCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["deny", "warn", "allow"],
+      "properties": {
+        "deny": { "type": "integer", "minimum": 0 },
+        "warn": { "type": "integer", "minimum": 0 },
+        "allow": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "changeCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "added",
+        "removed",
+        "version-changed",
+        "license-changed",
+        "supplier-changed",
+        "hash-changed",
+        "hash-coverage-changed",
+        "scope-changed",
+        "role-changed"
+      ],
+      "properties": {
+        "added": { "type": "integer", "minimum": 0 },
+        "removed": { "type": "integer", "minimum": 0 },
+        "version-changed": { "type": "integer", "minimum": 0 },
+        "license-changed": { "type": "integer", "minimum": 0 },
+        "supplier-changed": { "type": "integer", "minimum": 0 },
+        "hash-changed": { "type": "integer", "minimum": 0 },
+        "hash-coverage-changed": { "type": "integer", "minimum": 0 },
+        "scope-changed": { "type": "integer", "minimum": 0 },
+        "role-changed": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "unit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "subject",
+        "purl",
+        "ecosystem",
+        "namespace",
+        "name",
+        "group",
+        "qualifiers",
+        "subpath",
+        "version",
+        "epoch",
+        "kind",
+        "condition",
+        "role",
+        "configured",
+        "effective",
+        "rules",
+        "used_default",
+        "message",
+        "detail"
+      ],
+      "properties": {
+        "subject": { "enum": ["change", "document"] },
+        "purl": { "type": ["string", "null"] },
+        "ecosystem": { "type": ["string", "null"] },
+        "namespace": { "type": ["string", "null"] },
+        "name": { "type": ["string", "null"] },
+        "group": { "type": ["string", "null"] },
+        "qualifiers": { "type": "object", "additionalProperties": { "type": "string" } },
+        "subpath": { "type": ["string", "null"] },
+        "version": { "type": ["string", "null"] },
+        "epoch": { "type": ["string", "null"] },
+        "kind": { "type": ["string", "null"] },
+        "condition": { "type": ["string", "null"] },
+        "role": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/role" }] },
+        "configured": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/decision" }] },
+        "effective": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/decision" }] },
+        "rules": { "type": "array", "items": { "type": "string" } },
+        "used_default": { "type": "boolean" },
+        "message": { "type": "string" },
+        "detail": { "$ref": "#/$defs/detail" }
+      }
+    },
+    "detail": {
+      "oneOf": [
+        { "$ref": "#/$defs/added" },
+        { "$ref": "#/$defs/removed" },
+        { "$ref": "#/$defs/versionChanged" },
+        { "$ref": "#/$defs/setChangedLicense" },
+        { "$ref": "#/$defs/setChangedSupplier" },
+        { "$ref": "#/$defs/setChangedScope" },
+        { "$ref": "#/$defs/hashChanged" },
+        { "$ref": "#/$defs/hashCoverageChanged" },
+        { "$ref": "#/$defs/roleChanged" },
+        { "$ref": "#/$defs/rootChanged" },
+        { "$ref": "#/$defs/condition" }
+      ]
+    },
+    "added": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "introduced_by", "path_from_root", "attributes"],
+      "properties": {
+        "kind": { "const": "added" },
+        "introduced_by": { "$ref": "#/$defs/nodes" },
+        "path_from_root": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/nodes" }] },
+        "attributes": { "$ref": "#/$defs/attributes" }
+      }
+    },
+    "removed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "attributes"],
+      "properties": {
+        "kind": { "const": "removed" },
+        "attributes": { "$ref": "#/$defs/attributes" }
+      }
+    },
+    "versionChanged": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "direction",
+        "flags",
+        "old_version",
+        "old_epoch",
+        "new_version",
+        "new_epoch",
+        "old_attributes",
+        "new_attributes"
+      ],
+      "properties": {
+        "kind": { "const": "version-changed" },
+        "direction": { "enum": ["upgrade", "downgrade", "unknown"] },
+        "flags": { "type": "array", "items": { "type": "string" } },
+        "old_version": { "type": ["string", "null"] },
+        "old_epoch": { "type": ["string", "null"] },
+        "new_version": { "type": ["string", "null"] },
+        "new_epoch": { "type": ["string", "null"] },
+        "old_attributes": { "$ref": "#/$defs/attributes" },
+        "new_attributes": { "$ref": "#/$defs/attributes" }
+      }
+    },
+    "setChangedLicense": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "added", "removed"],
+      "properties": {
+        "kind": { "const": "license-changed" },
+        "added": { "type": "array", "items": { "type": "string" } },
+        "removed": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "setChangedSupplier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "added", "removed"],
+      "properties": {
+        "kind": { "const": "supplier-changed" },
+        "added": { "type": "array", "items": { "type": "string" } },
+        "removed": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "setChangedScope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "added", "removed"],
+      "properties": {
+        "kind": { "const": "scope-changed" },
+        "added": { "type": "array", "items": { "type": "string" } },
+        "removed": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "hashChanged": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "algorithms"],
+      "properties": {
+        "kind": { "const": "hash-changed" },
+        "algorithms": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/hashConflict" }
+        }
+      }
+    },
+    "hashCoverageChanged": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "added", "removed", "all_dropped"],
+      "properties": {
+        "kind": { "const": "hash-coverage-changed" },
+        "added": { "type": "array", "items": { "type": "string" } },
+        "removed": { "type": "array", "items": { "type": "string" } },
+        "all_dropped": { "type": "boolean" }
+      }
+    },
+    "roleChanged": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "old_role", "new_role"],
+      "properties": {
+        "kind": { "const": "role-changed" },
+        "old_role": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/role" }] },
+        "new_role": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/role" }] }
+      }
+    },
+    "rootChanged": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": { "kind": { "const": "root-changed" } }
+    },
+    "condition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": { "kind": { "const": "condition" } }
+    },
+    "nodes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["shown", "total"],
+      "properties": {
+        "shown": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+        "total": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["purl", "ecosystem", "namespace", "name", "group", "version", "epoch"],
+      "properties": {
+        "purl": { "type": ["string", "null"] },
+        "ecosystem": { "type": ["string", "null"] },
+        "namespace": { "type": ["string", "null"] },
+        "name": { "type": ["string", "null"] },
+        "group": { "type": ["string", "null"] },
+        "version": { "type": ["string", "null"] },
+        "epoch": { "type": ["string", "null"] }
+      }
+    },
+    "attributes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["licenses", "hashes", "suppliers", "scopes", "types"],
+      "properties": {
+        "licenses": { "type": "array", "items": { "type": "string" } },
+        "hashes": { "type": "array", "items": { "$ref": "#/$defs/hash" } },
+        "suppliers": { "type": "array", "items": { "type": "string" } },
+        "scopes": { "type": "array", "items": { "type": "string" } },
+        "types": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "hash": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["alg", "content"],
+      "properties": {
+        "alg": { "type": "string" },
+        "content": { "type": "string" }
+      }
+    },
+    "hashConflict": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "old_contents", "new_contents"],
+      "properties": {
+        "algorithm": { "type": "string" },
+        "old_contents": { "type": "array", "items": { "type": "string" } },
+        "new_contents": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "root": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["old", "new"],
+      "properties": {
+        "old": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/snapshot" }] },
+        "new": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/snapshot" }] }
+      }
+    },
+    "snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "purl",
+        "ecosystem",
+        "namespace",
+        "name",
+        "group",
+        "version",
+        "epoch",
+        "role",
+        "attributes"
+      ],
+      "properties": {
+        "purl": { "type": ["string", "null"] },
+        "ecosystem": { "type": ["string", "null"] },
+        "namespace": { "type": ["string", "null"] },
+        "name": { "type": ["string", "null"] },
+        "group": { "type": ["string", "null"] },
+        "version": { "type": "string" },
+        "epoch": { "type": ["string", "null"] },
+        "role": { "$ref": "#/$defs/role" },
+        "attributes": { "$ref": "#/$defs/attributes" }
+      }
+    },
+    "warnings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["old", "new"],
+      "properties": {
+        "old": { "type": "array", "items": { "$ref": "#/$defs/warning" } },
+        "new": { "type": "array", "items": { "$ref": "#/$defs/warning" } }
+      }
+    },
+    "warning": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "purl", "group", "name", "message"],
+      "properties": {
+        "kind": { "type": "string" },
+        "purl": { "type": ["string", "null"] },
+        "group": { "type": ["string", "null"] },
+        "name": { "type": ["string", "null"] },
+        "message": { "type": "string" }
+      }
+    }
+  }
+}
