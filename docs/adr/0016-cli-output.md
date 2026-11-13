@@ -38,8 +38,10 @@ The message names the input. `OLD` and `NEW` are the two SBOM arguments.
 canonicalized path. A `--max-depth` above 63 names the flag and does not
 name a file, because no file is opened.
 
-A closed stdout pipe (`bomward diff … | head -1`) ends the process with
-code 0 and no message. It is not an error and it does not panic.
+A closed stdout pipe (`bomward diff … | head -1`) writes nothing further
+and prints no message. The exit code stays the verdict: 0 or 1. It is
+not an error and it does not panic. A denial must not become a pass
+because the reader stopped.
 
 stdout uses LF, including on Windows. The report bytes do not contain
 CR.
@@ -49,9 +51,10 @@ CR.
 Code 1 has to be a finished verdict. Writing the report before exiting
 1 lets a pull-request comment show the denial that caused the failure.
 Code 2 means there is no verdict, so a half-written report would look
-like one. A closed pipe is the reader stopping, which is the same
-outcome as a successful short write. Printing `Broken pipe` would fail
-an otherwise green `head` pipeline.
+like one. A closed pipe is the reader stopping. The bytes already
+follow the verdict, so the process keeps that code and stays quiet.
+Printing `Broken pipe`, or forcing code 0, would hide a denial from a
+script that uses `pipefail`.
 
 ## Alternatives
 

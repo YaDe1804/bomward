@@ -34,7 +34,9 @@ code. They are part of the report.
 
 The foundation build exited 2 because `diff` was not implemented.
 [ADR 0016](0016-cli-output.md) is the current command: a finished report
-exits 0 or 1, and exit 2 means no report was written.
+exits 0 or 1, and exit 2 means no report was written. A reader that
+closes stdout early does not change that code and does not print a
+diagnostic.
 
 Determinism:
 

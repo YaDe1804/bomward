@@ -160,10 +160,13 @@ fn run_diff(
         None => None,
     };
     let text = render(&diff, verdict.as_ref(), report_format(format));
-    emit(&text, output)?;
-    Ok(verdict
+    let code = verdict
         .as_ref()
-        .map_or(0, bomward_core::policy::Verdict::exit_code))
+        .map_or(0, bomward_core::policy::Verdict::exit_code);
+    match emit(&text, output) {
+        Ok(()) | Err(CliError::ClosedPipe) => Ok(code),
+        Err(error) => Err(error),
+    }
 }
 
 fn read_document(

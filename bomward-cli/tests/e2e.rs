@@ -2,6 +2,7 @@
 
 //! End-to-end runs of `bomward diff`.
 
+use std::fmt::Write as _;
 use std::fs;
 use std::io::Read as _;
 use std::path::{Path, PathBuf};
@@ -321,6 +322,67 @@ fn limit_policy_and_write(
     assert!(!nested.exists());
     assert_eq!(output.stdout, b"");
     Ok(())
+}
+
+#[test]
+fn a_closed_stdout_pipe_keeps_a_deny() -> Result<(), Box<dyn std::error::Error>> {
+    let dir = scratch("pipe-deny")?;
+    let count = 12_000;
+    let old = dir.join("old.json");
+    let new = dir.join("new.json");
+    let policy = dir.join("deny.yaml");
+    fs::write(&old, document(0))?;
+    fs::write(&new, document(count))?;
+    fs::write(
+        &policy,
+        b"version: 1\nmode: enforce\ndefault: deny\nrules: []\n",
+    )?;
+    let mut child = bomward()
+        .args([
+            "diff",
+            &display(&old),
+            &display(&new),
+            "--policy",
+            &display(&policy),
+        ])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+    let mut stdout = child.stdout.take().ok_or("stdout was not piped")?;
+    let mut byte = [0u8; 1];
+    loop {
+        let read = stdout.read(&mut byte)?;
+        if read == 0 || byte[0] == b'\n' {
+            break;
+        }
+    }
+    drop(stdout);
+    let status = child.wait()?;
+    let mut stderr = String::new();
+    if let Some(mut pipe) = child.stderr.take() {
+        pipe.read_to_string(&mut stderr)?;
+    }
+    fs::remove_dir_all(&dir)?;
+    assert_eq!(status.code(), Some(1), "{stderr}");
+    assert!(stderr.is_empty(), "{stderr}");
+    Ok(())
+}
+
+fn document(components: usize) -> String {
+    let mut body = String::from(
+        r#"{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"type":"application","name":"app","version":"1"}},"components":["#,
+    );
+    for index in 0..components {
+        if index > 0 {
+            body.push(',');
+        }
+        let _ = write!(
+            body,
+            r#"{{"type":"library","name":"pkg{index}","version":"1.0.0"}}"#
+        );
+    }
+    body.push_str("]}");
+    body
 }
 
 #[test]
