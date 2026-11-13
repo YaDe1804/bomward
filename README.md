@@ -8,9 +8,9 @@ It is not another generic SBOM diff. `sbomdiff` and `sbom-tools` already
 report differences. bomward answers a review question: may this change
 pass, and why?
 
-**Status: pre-release.** The formats and the exit codes below are the
-v0.1 contract. The GitHub Action is in this repository. The release
-binary it downloads is not published yet.
+**Status: 0.1.0 is published.** From 0.1.0, the report formats and the
+exit codes are stable. JSON is `report_version` 1. Terminal and Markdown
+stay on the documented display text.
 
 ```text
 bomward diff bomward-core/tests/fixtures/lockward-old.cdx.json bomward-core/tests/fixtures/lockward-new.cdx.json --policy examples/policies/strict.yaml --format markdown
@@ -47,6 +47,27 @@ The contract is [docs/SPEC.md](docs/SPEC.md). Policy files are described
 in [docs/POLICY.md](docs/POLICY.md). The three report formats are
 described in [docs/REPORT.md](docs/REPORT.md). The GitHub Action is
 described in [docs/ACTION.md](docs/ACTION.md).
+
+## Install
+
+Pin the Action with `uses: YaDe1804/bomward@v0.1.0`. The workflow in the
+next section uses that pin.
+
+For the CLI, download the archive for the host and `SHA256SUMS` from the
+[v0.1.0 release](https://github.com/YaDe1804/bomward/releases/tag/v0.1.0),
+then check the archive before opening it. `SHA256SUMS` lists every
+archive, so `--ignore-missing` checks the file you downloaded:
+
+- `bomward-x86_64-unknown-linux-gnu.tar.gz` contains `bomward`
+- `bomward-aarch64-apple-darwin.tar.gz` contains `bomward`
+- `bomward-x86_64-pc-windows-msvc.zip` contains `bomward.exe`
+
+```text
+curl -fsSLO https://github.com/YaDe1804/bomward/releases/download/v0.1.0/SHA256SUMS
+curl -fsSLO https://github.com/YaDe1804/bomward/releases/download/v0.1.0/bomward-x86_64-unknown-linux-gnu.tar.gz
+sha256sum --check --ignore-missing SHA256SUMS
+tar -xzf bomward-x86_64-unknown-linux-gnu.tar.gz
+```
 
 ## GitHub Action
 
@@ -85,8 +106,7 @@ jobs:
           policy: path/to/policy.yaml
 ```
 
-`v0.1.0` is the default pin. That tag is not published yet. Until it
-exists, a foreign repository cannot download the binary.
+`v0.1.0` is the default pin.
 
 The step outputs `exit-code`, `terminal`, and `markdown`. `terminal` and
 `markdown` are the paths of those report files, so a later step can read

@@ -1,0 +1,109 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            archive: bomward-x86_64-unknown-linux-gnu.tar.gz
+            binary: bomward
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            archive: bomward-aarch64-apple-darwin.tar.gz
+            binary: bomward
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            archive: bomward-x86_64-pc-windows-msvc.zip
+            binary: bomward.exe
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+        with:
+          toolchain: "1.100.0"
+      - name: Require the native target
+        shell: bash
+        run: |
+          set -euo pipefail
+          host=$(rustc -vV | sed -n 's/^host: //p')
+          test "$host" = "${{ matrix.target }}"
+      - name: Build
+        run: cargo build --release --locked -p bomward-cli
+      - name: Pack archive
+        if: runner.os != 'Windows'
+        run: tar -czf "${{ matrix.archive }}" -C target/release "${{ matrix.binary }}"
+      - name: Pack archive
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Copy-Item -Path target/release/bomward.exe -Destination bomward.exe
+          Compress-Archive -Path bomward.exe -DestinationPath "${{ matrix.archive }}"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ matrix.archive }}
+          path: ${{ matrix.archive }}
+          if-no-files-found: error
+
+  publish:
+    name: publish
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          pattern: bomward-*
+          path: dist
+          merge-multiple: true
+      - name: Write and check SHA256SUMS
+        working-directory: dist
+        run: |
+          set -euo pipefail
+          sha256sum --text bomward-*.tar.gz bomward-*.zip > SHA256SUMS
+          sha256sum --check SHA256SUMS
+          valid=$(grep -Ec '^[0-9a-f]{64}  bomward-[^/[:space:]]+$' SHA256SUMS)
+          lines=$(grep -c . SHA256SUMS)
+          if [ "$valid" -ne 3 ] || [ "$lines" -ne 3 ]; then
+            echo "SHA256SUMS must be three bare sha256sum lines" >&2
+            cat SHA256SUMS >&2
+            exit 1
+          fi
+      - name: Publish the release
+        working-directory: dist
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          notes="${RUNNER_TEMP}/release-notes.md"
+          awk -v version="$version" '
+            $0 ~ "^## \\[" version "\\]" { found = 1 }
+            found && printed && /^## \[/ { exit }
+            found && /^\[/ { exit }
+            found { print; printed = 1 }
+          ' "$GITHUB_WORKSPACE/CHANGELOG.md" > "$notes"
+          if [ ! -s "$notes" ]; then
+            echo "CHANGELOG has no section for ${version}" >&2
+            exit 1
+          fi
+          gh release create "$tag" \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "$tag" \
+            --notes-file "$notes" \
+            bomward-*.tar.gz \
+            bomward-*.zip \
+            SHA256SUMS

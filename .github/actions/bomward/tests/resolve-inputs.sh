@@ -34,7 +34,7 @@ test "$BOMWARD_POLICY_PATH" = "policy.yaml"
 
 # shellcheck disable=SC1090
 eval "$(
-  GITHUB_EVENT_PATH= \
+  GITHUB_EVENT_PATH='' \
     GITHUB_SHA=abc \
     GITHUB_BASE_REF=main \
     BOMWARD_SBOM=sbom.json \

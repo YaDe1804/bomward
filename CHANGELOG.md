@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-13
+
 ### Added
 
 - Fuzzing for the decoder and the policy parser. A deterministic smoke
@@ -15,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   depth 32/33, JSON depth 127/128, dependency cycles, and a 100,000-hash
   component under the file-size limit. See [docs/FUZZING.md](docs/FUZZING.md)
   and [ADR 0018](docs/adr/0018-fuzzing-and-attribute-amplification.md).
-- GitHub Action `bomward review`. It diffs the pull-request SBOM against
+- GitHub Action `bomward SBOM review`. It diffs the pull-request SBOM against
   the baseline from the base commit, reads the policy from that same
   commit, and posts or updates one pull-request comment. The release
   asset is checked against `SHA256SUMS` before it runs. See
@@ -92,3 +94,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   JSON containers are capped at 127, and that error does not name the
   flag. `--max-depth` above 63 is a usage error.
 - GitHub Actions runs push builds on `main` only. Pull requests are unchanged.
+
+[Unreleased]: https://github.com/YaDe1804/bomward/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/YaDe1804/bomward/releases/tag/v0.1.0
