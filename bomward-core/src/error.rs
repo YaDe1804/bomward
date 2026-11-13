@@ -2,8 +2,8 @@
 
 //! Typed errors for the bomward library.
 //!
-//! [`Error::NotImplemented`] remains only for modules that are not written
-//! yet (`report`). Ingest and policy failures use the other variants.
+//! [`Error::NotImplemented`] remains so older callers keep a stable message.
+//! Ingest, policy, and the report use the other variants.
 //! Display text for a rejected `specVersion` is the sentence from ADR 0004.
 //! Display text for a limit is one of the sentences from ADR 0006.
 //!
@@ -24,8 +24,8 @@ use thiserror::Error;
 pub enum Error {
     /// A module that this milestone does not implement.
     ///
-    /// `report` still returns this variant. The CLI maps every error to
-    /// exit code 2.
+    /// Kept so the sentence `not implemented yet` stays stable.
+    /// The CLI maps every error to exit code 2.
     #[error("not implemented yet")]
     NotImplemented,
 

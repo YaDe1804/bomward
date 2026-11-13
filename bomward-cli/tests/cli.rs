@@ -38,6 +38,7 @@ fn help_shows_diff_command_and_options() -> Result<(), Box<dyn std::error::Error
     assert!(stdout.contains("--max-file-bytes"), "{stdout}");
     assert!(stdout.contains("--max-components"), "{stdout}");
     assert!(stdout.contains("--max-depth"), "{stdout}");
+    assert!(stdout.contains("--output"), "{stdout}");
     assert!(stdout.contains("No policy was applied."), "{stdout}");
     Ok(())
 }
@@ -55,6 +56,7 @@ fn diff_help_shows_planned_options() -> Result<(), Box<dyn std::error::Error>> {
     assert!(stdout.contains("--max-file-bytes"), "{stdout}");
     assert!(stdout.contains("--max-components"), "{stdout}");
     assert!(stdout.contains("--max-depth"), "{stdout}");
+    assert!(stdout.contains("--output"), "{stdout}");
     assert!(stdout.contains("No policy was applied."), "{stdout}");
     Ok(())
 }
@@ -67,10 +69,16 @@ fn diff_without_arguments_exits_2() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
-fn diff_with_paths_is_not_implemented() -> Result<(), Box<dyn std::error::Error>> {
-    let output = run(&["diff", "old.json", "new.json"])?;
+fn a_missing_old_file_names_old_and_exits_2() -> Result<(), Box<dyn std::error::Error>> {
+    let path = "old.json";
+    let output = run(&["diff", path, "new.json"])?;
     let stderr = String::from_utf8(output.stderr)?;
     assert_eq!(output.status.code(), Some(2));
-    assert!(stderr.contains("not implemented yet"), "{stderr}");
+    assert!(output.stdout.is_empty(), "{stderr}");
+    assert!(
+        stderr.starts_with("error: failed to read OLD old.json:"),
+        "{stderr}"
+    );
+    assert!(stderr.contains("os error 2"), "{stderr}");
     Ok(())
 }

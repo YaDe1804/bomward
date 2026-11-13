@@ -2,17 +2,23 @@
 
 //! Command-line interface for the bomward SBOM review gate.
 //!
-//! The binary parses arguments and maps library errors to process exit codes.
-//! Review logic lives in `bomward-core`.
+//! The binary parses arguments, calls the library, and maps the verdict to
+//! an exit code. Review logic lives in `bomward-core`.
 
 #![forbid(unsafe_code)]
 
+use std::fs::OpenOptions;
+use std::io::{self, Write as _};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use anyhow::Result;
-use bomward_core::Error as CoreError;
-use clap::{Parser, Subcommand, ValueEnum};
+use bomward_core::policy::{Policy, PolicyLimits};
+use bomward_core::report::{Format, render};
+use bomward_core::{Error as CoreError, Limits};
+use clap::{CommandFactory, FromArgMatches, Parser, Subcommand, ValueEnum};
+
+/// Width used for `--help`, so the golden file does not follow the console.
+const HELP_WIDTH: usize = 100;
 
 /// SBOM review gate for pull requests and releases.
 #[derive(Debug, Parser)]
@@ -24,12 +30,12 @@ use clap::{Parser, Subcommand, ValueEnum};
 SBOM review gate for pull requests and releases.
 
 The diff subcommand compares two CycloneDX JSON documents:
-  bomward diff <OLD> <NEW> [--policy <FILE>] [--format <terminal|markdown|json>] [--max-file-bytes N] [--max-components N] [--max-depth N]
+  bomward diff <OLD> <NEW> [--policy <FILE>] [--format <terminal|markdown|json>] [--output <FILE>] [--max-file-bytes N] [--max-components N] [--max-depth N]
 
 Without --policy the run is report-only and exits 0. Every output then includes the sentence \"No policy was applied.\"
 Limits default to 33554432 bytes, 100000 components, and depth 32. A violation names the limit, the value found, and the flag.
 
-Status: pre-release, not usable yet. diff exits 2.",
+Status: pre-release.",
     arg_required_else_help = true
 )]
 struct Cli {
@@ -54,6 +60,12 @@ enum Command {
         /// Report format.
         #[arg(long, value_enum, default_value = "terminal")]
         format: OutputFormat,
+        /// Write the report to this file instead of stdout.
+        ///
+        /// The file is created or truncated. Parent directories are not created.
+        /// Stdout stays empty.
+        #[arg(long, value_name = "FILE")]
+        output: Option<PathBuf>,
         /// Maximum size in bytes of one input file. Default: 33554432 (32 MiB).
         ///
         /// A violation names this limit, the size that was found, and `--max-file-bytes`.
@@ -83,24 +95,39 @@ enum OutputFormat {
     Json,
 }
 
+enum CliError {
+    Message(anyhow::Error),
+    ClosedPipe,
+}
+
+fn message(text: impl std::fmt::Display) -> CliError {
+    CliError::Message(anyhow::Error::msg(text.to_string()))
+}
+
 fn main() -> ExitCode {
-    let cli = Cli::parse();
-    match run(cli) {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(err) => {
-            eprintln!("error: {err}");
+    let matches = Cli::command().term_width(HELP_WIDTH).get_matches();
+    let cli = match Cli::from_arg_matches(&matches) {
+        Ok(cli) => cli,
+        Err(error) => error.exit(),
+    };
+    match execute(cli) {
+        Ok(code) => ExitCode::from(code),
+        Err(CliError::ClosedPipe) => ExitCode::SUCCESS,
+        Err(CliError::Message(error)) => {
+            eprintln!("error: {error}");
             ExitCode::from(2)
         }
     }
 }
 
-fn run(cli: Cli) -> Result<()> {
+fn execute(cli: Cli) -> Result<u8, CliError> {
     match cli.command {
         Command::Diff {
             old,
             new,
             policy,
             format,
+            output,
             max_file_bytes,
             max_components,
             max_depth,
@@ -109,17 +136,95 @@ fn run(cli: Cli) -> Result<()> {
             &new,
             policy.as_deref(),
             format,
+            output.as_deref(),
             (max_file_bytes, max_components, max_depth),
         ),
     }
 }
 
 fn run_diff(
-    _old: &Path,
-    _new: &Path,
-    _policy: Option<&Path>,
-    _format: OutputFormat,
-    _limits: (u64, u64, u32),
-) -> Result<()> {
-    Err(CoreError::NotImplemented.into())
+    old: &Path,
+    new: &Path,
+    policy: Option<&Path>,
+    format: OutputFormat,
+    output: Option<&Path>,
+    limits: (u64, u64, u32),
+) -> Result<u8, CliError> {
+    let limits = Limits::new(limits.0, limits.1, limits.2).map_err(message)?;
+    let old_document = read_document("OLD", old, &limits)?;
+    let new_document = read_document("NEW", new, &limits)?;
+    let diff = bomward_core::diff::diff(&old_document, &new_document);
+    let verdict = match policy {
+        Some(path) => Some(bomward_core::policy::evaluate(&read_policy(path)?, &diff)),
+        None => None,
+    };
+    let text = render(&diff, verdict.as_ref(), report_format(format));
+    emit(&text, output)?;
+    Ok(verdict
+        .as_ref()
+        .map_or(0, bomward_core::policy::Verdict::exit_code))
+}
+
+fn read_document(
+    which: &str,
+    path: &Path,
+    limits: &Limits,
+) -> Result<bomward_core::Document, CliError> {
+    bomward_core::read_path(path, limits).map_err(|error| message(explain(which, path, error)))
+}
+
+fn read_policy(path: &Path) -> Result<Policy, CliError> {
+    bomward_core::policy::read_path(path, &PolicyLimits::default())
+        .map_err(|error| message(explain("policy", path, error)))
+}
+
+fn explain(which: &str, path: &Path, error: CoreError) -> String {
+    let shown = path.display();
+    match error {
+        CoreError::Io { source, .. } => format!("failed to read {which} {shown}: {source}"),
+        CoreError::InvalidDocument(inner) => format!("{which} {shown}: {inner}"),
+        CoreError::UnsupportedSpecVersion { found } => format!(
+            "{which} {shown}: unsupported specVersion {found}; supported versions: 1.4, 1.5, 1.6, 1.7"
+        ),
+        CoreError::LimitExceeded(inner) => format!("{which} {shown}: {inner}"),
+        CoreError::InvalidPolicy(inner) => format!("policy {shown}: {inner}"),
+        CoreError::UnsupportedDepth(inner) => inner.to_string(),
+        other => format!("{which} {shown}: {other}"),
+    }
+}
+
+fn report_format(format: OutputFormat) -> Format {
+    match format {
+        OutputFormat::Terminal => Format::Terminal,
+        OutputFormat::Markdown => Format::Markdown,
+        OutputFormat::Json => Format::Json,
+    }
+}
+
+fn emit(text: &str, output: Option<&Path>) -> Result<(), CliError> {
+    let bytes = text.as_bytes();
+    match output {
+        Some(path) => write_file(path, bytes),
+        None => write_stdout(bytes),
+    }
+}
+
+fn write_file(path: &Path, bytes: &[u8]) -> Result<(), CliError> {
+    let mut file = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(path)
+        .map_err(|source| message(format!("failed to write {}: {source}", path.display())))?;
+    file.write_all(bytes)
+        .map_err(|source| message(format!("failed to write {}: {source}", path.display())))
+}
+
+fn write_stdout(bytes: &[u8]) -> Result<(), CliError> {
+    let mut stdout = io::stdout().lock();
+    match stdout.write_all(bytes) {
+        Ok(()) => Ok(()),
+        Err(source) if source.kind() == io::ErrorKind::BrokenPipe => Err(CliError::ClosedPipe),
+        Err(source) => Err(message(format!("failed to write stdout: {source}"))),
+    }
 }
