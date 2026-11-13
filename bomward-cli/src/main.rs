@@ -24,6 +24,7 @@ const HELP_WIDTH: usize = 100;
 #[derive(Debug, Parser)]
 #[command(
     name = "bomward",
+    bin_name = "bomward",
     version,
     about = "SBOM review gate for pull requests and releases.",
     long_about = "\

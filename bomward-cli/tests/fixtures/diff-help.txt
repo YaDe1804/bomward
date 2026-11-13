@@ -1,6 +1,6 @@
 Compare two `CycloneDX` JSON documents and judge the change
 
-Usage: bomward.exe diff [OPTIONS] <OLD> <NEW>
+Usage: bomward diff [OPTIONS] <OLD> <NEW>
 
 Arguments:
   <OLD>
