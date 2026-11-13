@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- GitHub Action `bomward review`. It diffs the pull-request SBOM against
+  the baseline from the base commit, reads the policy from that same
+  commit, and posts or updates one pull-request comment. The release
+  asset is checked against `SHA256SUMS` before it runs. See
+  [docs/ACTION.md](docs/ACTION.md) and
+  [ADR 0017](docs/adr/0017-github-action.md).
 - Policy version 1: `bomward-core` reads a YAML policy, rejects unknown
   fields, duplicate keys, and aliases, and evaluates a diff into a
   verdict. `mode: warn` turns `deny` into `warn`. Exit code 1 is

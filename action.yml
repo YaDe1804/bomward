@@ -1,0 +1,144 @@
+name: "bomward review"
+description: "Diff a pull request SBOM against the base branch and apply a policy from that same commit. The Action reads the new SBOM as data and does not run pull-request code."
+author: "Deniz Yayvan"
+branding:
+  icon: shield
+  color: blue
+
+inputs:
+  sbom:
+    description: "Path to the SBOM in the pull request"
+    required: true
+  policy:
+    description: "Path to the policy in the base branch. Empty means report-only."
+    required: false
+    default: ""
+  old-sbom:
+    description: "Path of the baseline SBOM in the base branch. Empty uses the sbom path."
+    required: false
+    default: ""
+  comment:
+    description: "Write or update the pull request comment (true/false)"
+    required: false
+    default: "true"
+  fail-on-deny:
+    description: "Exit 1 when bomward denies (true/false). An error (exit 2) always fails the check."
+    required: false
+    default: "true"
+  version:
+    description: "bomward release tag to download and verify"
+    required: false
+    default: "v0.1.0"
+  max-file-bytes:
+    description: "Passed to bomward when set. Empty keeps the CLI default."
+    required: false
+    default: ""
+  max-components:
+    description: "Passed to bomward when set. Empty keeps the CLI default."
+    required: false
+    default: ""
+  max-depth:
+    description: "Passed to bomward when set. Empty keeps the CLI default."
+    required: false
+    default: ""
+
+outputs:
+  exit-code:
+    description: "bomward verdict (0 pass or report-only, 1 deny, 2 error)"
+    value: ${{ steps.gate.outputs.exit-code }}
+  terminal:
+    description: "Path to the terminal report"
+    value: ${{ steps.gate.outputs.terminal }}
+  markdown:
+    description: "Path to the Markdown report"
+    value: ${{ steps.gate.outputs.markdown }}
+
+runs:
+  using: composite
+  steps:
+    - id: gate
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        BOMWARD_SBOM: ${{ inputs.sbom }}
+        BOMWARD_OLD_SBOM: ${{ inputs.old-sbom }}
+        BOMWARD_POLICY: ${{ inputs.policy }}
+        BOMWARD_VERSION: ${{ inputs.version }}
+        BOMWARD_COMMENT: ${{ inputs.comment }}
+        BOMWARD_FAIL_ON_DENY: ${{ inputs.fail-on-deny }}
+        BOMWARD_MAX_FILE_BYTES: ${{ inputs.max-file-bytes }}
+        BOMWARD_MAX_COMPONENTS: ${{ inputs.max-components }}
+        BOMWARD_MAX_DEPTH: ${{ inputs.max-depth }}
+        BOMWARD_REPOSITORY: YaDe1804/bomward
+      run: |
+        set -euo pipefail
+        action_root="${GITHUB_ACTION_PATH}"
+        if command -v cygpath >/dev/null 2>&1; then
+          action_root=$(cygpath -u "$action_root")
+        fi
+        scripts="${action_root}/.github/actions/bomward/scripts"
+
+        eval "$(bash "${scripts}/resolve-inputs.sh")"
+        export BOMWARD_BASE_SHA BOMWARD_HEAD_SHA BOMWARD_PR_NUMBER
+        export BOMWARD_SBOM_PATH BOMWARD_OLD_SBOM_PATH BOMWARD_POLICY_PATH
+
+        work="${RUNNER_TEMP:-/tmp}/bomward-${GITHUB_JOB:-local}"
+        mkdir -p "$work"
+
+        export BOMWARD_REPO_PATH="$BOMWARD_OLD_SBOM_PATH"
+        export BOMWARD_DEST="${work}/old-sbom"
+        eval "$(bash "${scripts}/fetch-from-base.sh")"
+        old="$BOMWARD_FETCHED"
+
+        policy_file=""
+        if [ -n "$BOMWARD_POLICY_PATH" ]; then
+          export BOMWARD_REPO_PATH="$BOMWARD_POLICY_PATH"
+          export BOMWARD_DEST="${work}/policy"
+          eval "$(bash "${scripts}/fetch-from-base.sh")"
+          policy_file="$BOMWARD_FETCHED"
+        fi
+
+        eval "$(bash "${scripts}/install-bomward.sh")"
+        export BOMWARD_BIN
+
+        export BOMWARD_OLD="$old"
+        export BOMWARD_NEW="$BOMWARD_SBOM_PATH"
+        export BOMWARD_POLICY="$policy_file"
+        export BOMWARD_OUT_DIR="${work}/out"
+
+        set +e
+        gate_out=$(bash "${scripts}/run-gate.sh")
+        verdict=$?
+        set -e
+
+        if [ "$verdict" -ne 0 ] && [ "$verdict" -ne 1 ]; then
+          if [ -n "${GITHUB_OUTPUT:-}" ]; then
+            printf 'exit-code=%s\n' "$verdict" >>"$GITHUB_OUTPUT"
+          fi
+          exit "$verdict"
+        fi
+
+        eval "$gate_out"
+        if [ "$BOMWARD_COMMENT" = "true" ]; then
+          export BOMWARD_BODY_FILE="$BOMWARD_MARKDOWN"
+          export BOMWARD_PR="$BOMWARD_PR_NUMBER"
+          bash "${scripts}/upsert-comment.sh"
+        fi
+        if [ -n "${GITHUB_OUTPUT:-}" ]; then
+          printf 'exit-code=%s\n' "$verdict" >>"$GITHUB_OUTPUT"
+          printf 'json=%s\n' "$BOMWARD_JSON" >>"$GITHUB_OUTPUT"
+          printf 'terminal=%s\n' "$BOMWARD_TERMINAL" >>"$GITHUB_OUTPUT"
+          printf 'markdown=%s\n' "$BOMWARD_MARKDOWN" >>"$GITHUB_OUTPUT"
+        fi
+        if [ "$BOMWARD_FAIL_ON_DENY" = "true" ]; then
+          exit "$verdict"
+        fi
+        exit 0
+
+    - name: Upload JSON report
+      if: always() && steps.gate.outputs.json != ''
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: bomward-report-${{ github.job }}
+        path: ${{ steps.gate.outputs.json }}
+        if-no-files-found: ignore
